@@ -1,0 +1,76 @@
+{
+  "idf.pythonInstallPath": "C:\\Espressif\\tools\\idf-python\\3.11.2\\python.exe",
+  "idf.espIdfPathWin": "C:/Espressif/frameworks/esp-idf-v5.4.2/",
+  "idf.toolsPathWin": "C:\\Espressif",
+  "idf.flashType": "UART",
+  "idf.portWin": "COM19",
+
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": false,
+  "lrutabs.maxTabs": 8,
+
+  // Use clang-format extension as the default formatter for C/C++
+  "[c]": {
+    "editor.defaultFormatter": "ms-vscode.cpptools"
+  },
+  "[cpp]": {
+    "editor.defaultFormatter": "ms-vscode.cpptools"
+  },
+  "[h]": {
+    "editor.defaultFormatter": "ms-vscode.cpptools"
+  },
+
+  "C_Cpp.clang_format_style": "file",
+
+  "files.associations": {
+    "*.h": "c"
+  },
+
+  // Clang-format configuration
+  "clang-format.enable": true,
+  "clang-format.style": "Google",
+  "clang-format.fallbackStyle": "Google",
+
+  // Comprehensive exclusion patterns
+  "clang-format.exclude": [
+    "**/lib/**",
+    "**/lib/PsychiHttp/**",
+    "**/lib/hal-*/**",
+    "**/docs/**",
+    "**/memory-bank/**",
+    "**/web-ui/**",
+    "**/managed_components/**",
+    "**/data/**",
+    "**/test/**",
+    "**/tests/**",
+    "**/*.md",
+    "**/*.txt",
+    "**/*.json",
+    "**/*.xml",
+    "**/*.yml",
+    "**/*.yaml",
+    "**/platformio.ini",
+    "**/CMakeLists.txt",
+    "**/sdkconfig*",
+    "**/package*.json",
+    "**/*.webmanifest",
+    "**/*.css",
+    "**/*.scss",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.js",
+    "**/*.jsx",
+    "**/*.html",
+    "**/*.svg",
+    "**/*.png",
+    "**/*.jpg",
+    "**/*.jpeg",
+    "**/*.gif",
+    "**/*.ico",
+    "**/*.gz",
+    "**/*.csv"
+  ],
+
+  // Disable C/C++ extension's built-in formatting to avoid conflicts
+  "C_Cpp.clang_format_fallbackStyle": "Google"
+}

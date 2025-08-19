@@ -1,0 +1,26 @@
+#define FIRMWARE_VERSION "1.0.0"
+
+#define BUTTON_ENTER_GPIO 0
+
+#define COMP_1_OUT_GPIO 1
+#define COMP_2_OUT_GPIO 2
+#define COMP_3_OUT_GPIO 4
+#define COMP_4_OUT_GPIO 6
+
+#define CRSF_RX_IN_GPIO 13
+
+#define ACC_INT_GPIO 5
+#define ACC_SPI_CLK_GPIO 7
+#define ACC_SPI_MISO_GPIO 9
+#define ACC_SPI_MOSI_GPIO 11
+#define ACC_SPI_CS_GPIO 12
+
+#define LED_OUT_GPIO 40
+
+#define SD_SPI_CLK_GPIO 36
+#define SD_SPI_CS_GPIO 34
+#define SD_SPI_MISO_GPIO 3
+#define SD_SPI_MOSI_GPIO 5
+
+#define DAC_OUT_1_GPIO 17
+#define DAC_OUT_2_GPIO 18
