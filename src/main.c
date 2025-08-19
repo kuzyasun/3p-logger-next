@@ -7,10 +7,12 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "hal/gpio.h"
+#include "io/io_manager.h"
 #include "platform/system.h"
 
 static const char *TAG = "Main";
 
+static io_manager_t io_manager;
 // Task to blink the board LED every second
 void led_blink_task(void *pvParameters) {
     // Setup GPIO pin as output
@@ -53,6 +55,7 @@ void app_main() {
     LOG_I(TAG, "ESP32 CPU Frequency: %lu MHz", system_get_cpu_frequency_mhz());
     LOG_I(TAG, "ESP32 CPU Cores: %lu", system_get_cpu_cores());
 
+    io_manager_init(&io_manager);
     // Create LED blink task
     xTaskCreate(led_blink_task, "led_blink", 2048, NULL, 5, NULL);
     LOG_I(TAG, "LED blink task created");

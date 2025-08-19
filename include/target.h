@@ -24,3 +24,10 @@
 
 #define DAC_OUT_1_GPIO 17
 #define DAC_OUT_2_GPIO 18
+
+// Task Priority Definitions
+typedef enum {
+    TASK_PRIORITY_IDLE = 0,         // tskIDLE_PRIORITY equivalent
+    TASK_PRIORITY_DEFAULT = 1,      // Default priority for most tasks
+    TASK_PRIORITY_UART_EVENT = 10,  // UART event task priority
+} task_priority_t;
