@@ -4,9 +4,6 @@
 #include "protocols/protocol_parser.h"
 #include "util/time-util.h"
 
-// Forward declaration
-typedef struct atp_s atp_t;
-
 #define MSP_BUFFER_SIZE 64
 
 // --- MSP Command Definitions ---
@@ -63,7 +60,6 @@ typedef struct {
 typedef struct {
     protocol_parser_t parser;
     msp_state_t state;
-    atp_t *atp_ctx;
 } msp_parser_t;
 
-void msp_parser_init(msp_parser_t *instance, atp_t *atp_ctx);
+void msp_parser_init(msp_parser_t *instance);

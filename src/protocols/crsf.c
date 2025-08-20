@@ -40,7 +40,7 @@ static uint8_t crsf_crc8(const uint8_t *data, size_t len) {
 static inline int16_t decode_gps_alt_crsf(int16_t raw) { return (raw > 100) ? (raw - 1000) : raw; }
 
 // The only public function needed to create an instance
-void crsf_parser_init(crsf_parser_t *instance, atp_t *atp_ctx) {
+void crsf_parser_init(crsf_parser_t *instance) {
     if (!instance) {
         LOG_E(TAG, "Invalid instance pointer");
         return;
@@ -57,9 +57,6 @@ void crsf_parser_init(crsf_parser_t *instance, atp_t *atp_ctx) {
     memset(&instance->state, 0, sizeof(crsf_state_t));
     instance->state.buf_pos = 0;
     instance->state.last_frame_recv = 0;
-
-    // Store the ATP context for app_state updates
-    instance->atp_ctx = atp_ctx;
 
     // Tuned for mountain flying (робастність проти нулів GPS)
     AltFuserCfg cfg = {
@@ -375,6 +372,13 @@ bool crsf_process_frame(crsf_state_t *state, const uint8_t *frame_data, size_t f
             app_state_t *app_state = app_state_get_instance();
             app_state_begin_update();
             app_state_set_u8(APP_STATE_FIELD_PLANE_RSSI, &app_state->plane_rssi, state->downlink_lq);
+            app_state_set_i8(APP_STATE_FIELD_PLANE_UPLINK_RSSI, &app_state->plane_uplink_rssi, state->uplink_rssi_dbm);
+            app_state_set_u8(APP_STATE_FIELD_PLANE_UPLINK_LQ, &app_state->plane_uplink_lq, state->uplink_lq);
+            app_state_set_i8(APP_STATE_FIELD_PLANE_UPLINK_SNR, &app_state->plane_uplink_snr, state->uplink_snr_db);
+            app_state_set_i8(APP_STATE_FIELD_PLANE_DOWNLINK_RSSI, &app_state->plane_downlink_rssi, state->downlink_rssi_dbm);
+            app_state_set_u8(APP_STATE_FIELD_PLANE_DOWNLINK_LQ, &app_state->plane_downlink_lq, state->downlink_lq);
+            app_state_set_i8(APP_STATE_FIELD_PLANE_DOWNLINK_SNR, &app_state->plane_downlink_snr, state->downlink_snr_db);
+            app_state_set_u8(APP_STATE_FIELD_PLANE_RF_POWER_LEVEL, &app_state->plane_rf_power_level, state->rf_power_level);
             app_state_end_update();
 
             LOG_D(TAG, "Link: UL_RSSI=%ddBm, UL_LQ=%d%%, DL_RSSI=%ddBm, DL_LQ=%d%%", state->uplink_rssi_dbm, state->uplink_lq, state->downlink_rssi_dbm,
@@ -468,16 +472,33 @@ bool crsf_process_frame(crsf_state_t *state, const uint8_t *frame_data, size_t f
                 state->esc_telemetry[esc_index].current_a = (float)current * 0.1f;
                 state->esc_telemetry[esc_index].temperature_c = temperature;
 
-                // Update app_state with ESC telemetry (using ESC 0 as primary)
+                // Update app_state with ESC telemetry
+                app_state_t *app_state = app_state_get_instance();
+                app_state_begin_update();
+
                 if (esc_index == 0) {
-                    app_state_t *app_state = app_state_get_instance();
-                    app_state_begin_update();
                     app_state_set_i32(APP_STATE_FIELD_PLANE_ESC_RPM, &app_state->plane_esc_rpm, state->esc_telemetry[esc_index].rpm);
                     app_state_set_u16(APP_STATE_FIELD_PLANE_ESC_VOLTAGE, &app_state->plane_esc_voltage, voltage);
                     app_state_set_u16(APP_STATE_FIELD_PLANE_ESC_CURRENT, &app_state->plane_esc_current, current);
                     app_state_set_u8(APP_STATE_FIELD_PLANE_ESC_TEMPERATURE, &app_state->plane_esc_temperature, temperature);
-                    app_state_end_update();
+                } else if (esc_index == 1) {
+                    app_state_set_i32(APP_STATE_FIELD_PLANE_ESC2_RPM, &app_state->plane_esc2_rpm, state->esc_telemetry[esc_index].rpm);
+                    app_state_set_u16(APP_STATE_FIELD_PLANE_ESC2_VOLTAGE, &app_state->plane_esc2_voltage, voltage);
+                    app_state_set_u16(APP_STATE_FIELD_PLANE_ESC2_CURRENT, &app_state->plane_esc2_current, current);
+                    app_state_set_u8(APP_STATE_FIELD_PLANE_ESC2_TEMPERATURE, &app_state->plane_esc2_temperature, temperature);
+                } else if (esc_index == 2) {
+                    app_state_set_i32(APP_STATE_FIELD_PLANE_ESC3_RPM, &app_state->plane_esc3_rpm, state->esc_telemetry[esc_index].rpm);
+                    app_state_set_u16(APP_STATE_FIELD_PLANE_ESC3_VOLTAGE, &app_state->plane_esc3_voltage, voltage);
+                    app_state_set_u16(APP_STATE_FIELD_PLANE_ESC3_CURRENT, &app_state->plane_esc3_current, current);
+                    app_state_set_u8(APP_STATE_FIELD_PLANE_ESC3_TEMPERATURE, &app_state->plane_esc3_temperature, temperature);
+                } else if (esc_index == 3) {
+                    app_state_set_i32(APP_STATE_FIELD_PLANE_ESC4_RPM, &app_state->plane_esc4_rpm, state->esc_telemetry[esc_index].rpm);
+                    app_state_set_u16(APP_STATE_FIELD_PLANE_ESC4_VOLTAGE, &app_state->plane_esc4_voltage, voltage);
+                    app_state_set_u16(APP_STATE_FIELD_PLANE_ESC4_CURRENT, &app_state->plane_esc4_current, current);
+                    app_state_set_u8(APP_STATE_FIELD_PLANE_ESC4_TEMPERATURE, &app_state->plane_esc4_temperature, temperature);
                 }
+
+                app_state_end_update();
 
                 LOG_D(TAG, "ESC #%d: RPM=%d, V=%.1f, A=%.1f, Temp=%dC", esc_index, state->esc_telemetry[esc_index].rpm,
                       state->esc_telemetry[esc_index].voltage_v, state->esc_telemetry[esc_index].current_a, state->esc_telemetry[esc_index].temperature_c);

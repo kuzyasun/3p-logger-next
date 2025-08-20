@@ -1,4 +1,4 @@
-#define FIRMWARE_VERSION "1.0.0"
+#pragma once
 
 #define BUTTON_ENTER_GPIO 0
 
@@ -29,5 +29,6 @@
 typedef enum {
     TASK_PRIORITY_IDLE = 0,         // tskIDLE_PRIORITY equivalent
     TASK_PRIORITY_DEFAULT = 1,      // Default priority for most tasks
+    TASK_PRIORITY_APP_LOGIC = 2,    // App logic task priority
     TASK_PRIORITY_UART_EVENT = 10,  // UART event task priority
 } task_priority_t;

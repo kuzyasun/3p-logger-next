@@ -42,6 +42,51 @@ typedef enum {
     APP_STATE_FIELD_PLANE_VTX_POWER = (1ULL << 23),
     APP_STATE_FIELD_PLANE_RC_CHANNELS = (1ULL << 24),
 
+    // Missing fields that are used by protocols
+    APP_STATE_FIELD_PLANE_ARMED = (1ULL << 25),
+    APP_STATE_FIELD_PLANE_HOME_DIST = (1ULL << 26),
+    APP_STATE_FIELD_PLANE_HOME_DIR = (1ULL << 27),
+
+    // Additional GPS parameters
+    APP_STATE_FIELD_PLANE_GPS_HDOP = (1ULL << 28),
+    APP_STATE_FIELD_PLANE_GPS_VDOP = (1ULL << 29),
+    APP_STATE_FIELD_PLANE_GPS_PDOP = (1ULL << 30),
+    APP_STATE_FIELD_PLANE_GPS_FIX_MODE = (1ULL << 31),
+    APP_STATE_FIELD_PLANE_GPS_SATS_IN_VIEW = (1ULL << 32),
+    APP_STATE_FIELD_PLANE_GPS_GEO_SEP = (1ULL << 33),
+    APP_STATE_FIELD_PLANE_GPS_MAG_VARIATION = (1ULL << 34),
+
+    // Additional telemetry parameters
+    APP_STATE_FIELD_PLANE_UPLINK_RSSI = (1ULL << 35),
+    APP_STATE_FIELD_PLANE_UPLINK_LQ = (1ULL << 36),
+    APP_STATE_FIELD_PLANE_UPLINK_SNR = (1ULL << 37),
+    APP_STATE_FIELD_PLANE_DOWNLINK_RSSI = (1ULL << 38),
+    APP_STATE_FIELD_PLANE_DOWNLINK_LQ = (1ULL << 39),
+    APP_STATE_FIELD_PLANE_DOWNLINK_SNR = (1ULL << 40),
+    APP_STATE_FIELD_PLANE_RF_POWER_LEVEL = (1ULL << 41),
+
+    // Additional ESC telemetry (for multiple ESCs)
+    APP_STATE_FIELD_PLANE_ESC2_RPM = (1ULL << 42),
+    APP_STATE_FIELD_PLANE_ESC2_VOLTAGE = (1ULL << 43),
+    APP_STATE_FIELD_PLANE_ESC2_CURRENT = (1ULL << 44),
+    APP_STATE_FIELD_PLANE_ESC2_TEMPERATURE = (1ULL << 45),
+    APP_STATE_FIELD_PLANE_ESC3_RPM = (1ULL << 46),
+    APP_STATE_FIELD_PLANE_ESC3_VOLTAGE = (1ULL << 47),
+    APP_STATE_FIELD_PLANE_ESC3_CURRENT = (1ULL << 48),
+    APP_STATE_FIELD_PLANE_ESC3_TEMPERATURE = (1ULL << 49),
+    APP_STATE_FIELD_PLANE_ESC4_RPM = (1ULL << 50),
+    APP_STATE_FIELD_PLANE_ESC4_VOLTAGE = (1ULL << 51),
+    APP_STATE_FIELD_PLANE_ESC4_CURRENT = (1ULL << 52),
+    APP_STATE_FIELD_PLANE_ESC4_TEMPERATURE = (1ULL << 53),
+
+    // Additional time/date parameters
+    APP_STATE_FIELD_PLANE_GPS_TIME_HOURS = (1ULL << 54),
+    APP_STATE_FIELD_PLANE_GPS_TIME_MINUTES = (1ULL << 55),
+    APP_STATE_FIELD_PLANE_GPS_TIME_SECONDS = (1ULL << 56),
+    APP_STATE_FIELD_PLANE_GPS_DATE_DAY = (1ULL << 57),
+    APP_STATE_FIELD_PLANE_GPS_DATE_MONTH = (1ULL << 58),
+    APP_STATE_FIELD_PLANE_GPS_DATE_YEAR = (1ULL << 59),
+
 } app_state_field_mask_e;
 
 typedef enum {
@@ -79,6 +124,51 @@ typedef struct app_state_s {
     uint8_t plane_vtx_channel;       // VTX channel
     uint8_t plane_vtx_power;         // VTX power level
     uint16_t plane_rc_channels[16];  // RC channel values (11-bit each)
+
+    // Missing fields that are used by protocols
+    uint8_t plane_armed;      // Armed status (0/1)
+    int16_t plane_home_dist;  // Distance to home in meters
+    int16_t plane_home_dir;   // Direction to home in degrees
+
+    // Additional GPS parameters
+    uint16_t plane_gps_hdop;          // Horizontal dilution of precision * 100
+    uint16_t plane_gps_vdop;          // Vertical dilution of precision * 100
+    uint16_t plane_gps_pdop;          // Position dilution of precision * 100
+    uint8_t plane_gps_fix_mode;       // Fix mode (1=no fix, 2=2D, 3=3D)
+    uint8_t plane_gps_sats_in_view;   // Number of satellites in view
+    int16_t plane_gps_geo_sep;        // Geoid separation in cm
+    int16_t plane_gps_mag_variation;  // Magnetic variation in degrees * 10
+
+    // Additional telemetry parameters
+    int8_t plane_uplink_rssi;      // Uplink RSSI in dBm
+    uint8_t plane_uplink_lq;       // Uplink link quality in %
+    int8_t plane_uplink_snr;       // Uplink SNR in dB
+    int8_t plane_downlink_rssi;    // Downlink RSSI in dBm
+    uint8_t plane_downlink_lq;     // Downlink link quality in %
+    int8_t plane_downlink_snr;     // Downlink SNR in dB
+    uint8_t plane_rf_power_level;  // RF power level
+
+    // Additional ESC telemetry (for multiple ESCs)
+    int32_t plane_esc2_rpm;          // ESC2 RPM
+    uint16_t plane_esc2_voltage;     // ESC2 voltage in mV
+    uint16_t plane_esc2_current;     // ESC2 current in mA
+    uint8_t plane_esc2_temperature;  // ESC2 temperature in °C
+    int32_t plane_esc3_rpm;          // ESC3 RPM
+    uint16_t plane_esc3_voltage;     // ESC3 voltage in mV
+    uint16_t plane_esc3_current;     // ESC3 current in mA
+    uint8_t plane_esc3_temperature;  // ESC3 temperature in °C
+    int32_t plane_esc4_rpm;          // ESC4 RPM
+    uint16_t plane_esc4_voltage;     // ESC4 voltage in mV
+    uint16_t plane_esc4_current;     // ESC4 current in mA
+    uint8_t plane_esc4_temperature;  // ESC4 temperature in °C
+
+    // Additional time/date parameters
+    uint8_t plane_gps_time_hours;    // GPS time hours
+    uint8_t plane_gps_time_minutes;  // GPS time minutes
+    uint8_t plane_gps_time_seconds;  // GPS time seconds
+    uint8_t plane_gps_date_day;      // GPS date day
+    uint8_t plane_gps_date_month;    // GPS date month
+    uint8_t plane_gps_date_year;     // GPS date year (2-digit)
 
     Notifier *changed_notifier;
     uint64_t changed_mask;

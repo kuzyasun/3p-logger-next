@@ -4,9 +4,6 @@
 #include "protocols/protocol_parser.h"  // Include the common interface
 #include "util/time-util.h"
 
-// Forward declaration
-typedef struct atp_s atp_t;
-
 #define UBLOX_BUFFER_SIZE 256
 
 // The internal state of the UBLOX decoder
@@ -30,8 +27,7 @@ typedef struct {
 typedef struct {
     protocol_parser_t parser;  // The base parser "class"
     ublox_state_t state;       // The internal state
-    atp_t *atp_ctx;            // Context for updating app_state
 } ublox_parser_t;
 
 // The only public function needed to create an instance
-void ublox_parser_init(ublox_parser_t *instance, atp_t *atp_ctx);
+void ublox_parser_init(ublox_parser_t *instance);

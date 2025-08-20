@@ -13,11 +13,10 @@ static void ublox_parser_internal_process_byte(void *parser_state, uint8_t byte)
 static void ublox_parser_internal_destroy(void *parser_state);
 
 // Internal helper function for UBLOX frame processing
-static bool ublox_process_frame(ublox_state_t *state, uint8_t msg_class, uint8_t msg_id,
-                                const uint8_t *frame_data, size_t frame_length);
+static bool ublox_process_frame(ublox_state_t *state, uint8_t msg_class, uint8_t msg_id, const uint8_t *frame_data, size_t frame_length);
 
 // The only public function needed to create an instance
-void ublox_parser_init(ublox_parser_t *instance, atp_t *atp_ctx) {
+void ublox_parser_init(ublox_parser_t *instance) {
     if (!instance) {
         LOG_E(TAG, "Invalid instance pointer");
         return;
@@ -40,9 +39,6 @@ void ublox_parser_init(ublox_parser_t *instance, atp_t *atp_ctx) {
     instance->state.msg_id = 0;
     instance->state.ck_a = 0;
     instance->state.ck_b = 0;
-
-    // Store the ATP context for app_state updates
-    instance->atp_ctx = atp_ctx;
 
     LOG_I(TAG, "UBLOX parser instance initialized");
 }
@@ -135,8 +131,7 @@ static void ublox_parser_internal_process_byte(void *parser_state, uint8_t byte)
             if (byte == state->ck_b) {
                 time_micros_t now = time_micros_now();
                 state->last_frame_recv = now;
-                ublox_process_frame(state, state->msg_class, state->msg_id, state->buf,
-                                    state->payload_length);
+                ublox_process_frame(state, state->msg_class, state->msg_id, state->buf, state->payload_length);
             } else {
                 LOG_W(TAG, "UBLOX checksum B mismatch");
             }
@@ -159,8 +154,7 @@ static void ublox_parser_internal_destroy(void *parser_state) {
 }
 
 // Internal helper function: Process a complete UBLOX frame
-static bool ublox_process_frame(ublox_state_t *state, uint8_t msg_class, uint8_t msg_id,
-                                const uint8_t *frame_data, size_t frame_length) {
+static bool ublox_process_frame(ublox_state_t *state, uint8_t msg_class, uint8_t msg_id, const uint8_t *frame_data, size_t frame_length) {
     if (!frame_data || frame_length == 0) {
         return false;
     }
@@ -183,9 +177,7 @@ static bool ublox_process_frame(ublox_state_t *state, uint8_t msg_class, uint8_t
         app_state_set_i16(APP_STATE_FIELD_PLANE_HEADING, &app_state->plane_heading, (int16_t)(heading / 100000));
         app_state_end_update();
 
-        LOG_D(TAG,
-              "UBLOX NAV-PVT: Lat=%d Lon=%d Alt=%dm Speed=%dm/s Heading=%d",
-              lat, lon, h_msl / 1000, gspeed / 1000, heading / 100000);
+        LOG_D(TAG, "UBLOX NAV-PVT: Lat=%d Lon=%d Alt=%dm Speed=%dm/s Heading=%d", lat, lon, h_msl / 1000, gspeed / 1000, heading / 100000);
 
         return true;
     }

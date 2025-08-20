@@ -18,7 +18,7 @@ static void nmea_parser_internal_destroy(void *parser_state);
 static bool nmea_process_sentence(nmea_state_t *state, const uint8_t *sentence_data, size_t sentence_length);
 
 // The only public function needed to create an instance
-void nmea_parser_init(nmea_parser_t *instance, atp_t *atp_ctx) {
+void nmea_parser_init(nmea_parser_t *instance) {
     if (!instance) {
         LOG_E(TAG, "Invalid instance pointer");
         return;
@@ -36,9 +36,6 @@ void nmea_parser_init(nmea_parser_t *instance, atp_t *atp_ctx) {
     instance->state.buf_pos = 0;
     instance->state.last_frame_recv = 0;
     instance->state.gps = &gps;
-
-    // Store the ATP context for app_state updates
-    instance->atp_ctx = atp_ctx;
 
     LOG_I(TAG, "NMEA parser instance initialized");
 }
@@ -128,6 +125,26 @@ static bool nmea_process_sentence(nmea_state_t *state, const uint8_t *sentence_d
                 app_state_set_i32(APP_STATE_FIELD_PLANE_ALTITUDE, &app_state->plane_altitude, (int32_t)(state->gps->altitude * 100));
                 app_state_set_i16(APP_STATE_FIELD_PLANE_SPEED, &app_state->plane_speed, (int16_t)gps_to_speed(state->gps->speed, gps_speed_mps));
                 app_state_set_i16(APP_STATE_FIELD_PLANE_HEADING, &app_state->plane_heading, (int16_t)state->gps->coarse);
+
+                // Additional GPS parameters
+                app_state_set_u8(APP_STATE_FIELD_PLANE_STAR, &app_state->plane_star, state->gps->sats_in_use);
+                app_state_set_u8(APP_STATE_FIELD_PLANE_FIX, &app_state->plane_fix, state->gps->fix);
+                app_state_set_u8(APP_STATE_FIELD_PLANE_GPS_FIX_MODE, &app_state->plane_gps_fix_mode, state->gps->fix_mode);
+                app_state_set_u8(APP_STATE_FIELD_PLANE_GPS_SATS_IN_VIEW, &app_state->plane_gps_sats_in_view, state->gps->sats_in_view);
+                app_state_set_u16(APP_STATE_FIELD_PLANE_GPS_HDOP, &app_state->plane_gps_hdop, (uint16_t)(state->gps->dop_h * 100));
+                app_state_set_u16(APP_STATE_FIELD_PLANE_GPS_VDOP, &app_state->plane_gps_vdop, (uint16_t)(state->gps->dop_v * 100));
+                app_state_set_u16(APP_STATE_FIELD_PLANE_GPS_PDOP, &app_state->plane_gps_pdop, (uint16_t)(state->gps->dop_p * 100));
+                app_state_set_i16(APP_STATE_FIELD_PLANE_GPS_GEO_SEP, &app_state->plane_gps_geo_sep, (int16_t)(state->gps->geo_sep * 100));
+                app_state_set_i16(APP_STATE_FIELD_PLANE_GPS_MAG_VARIATION, &app_state->plane_gps_mag_variation, (int16_t)(state->gps->variation * 10));
+
+                // GPS time and date
+                app_state_set_u8(APP_STATE_FIELD_PLANE_GPS_TIME_HOURS, &app_state->plane_gps_time_hours, state->gps->hours);
+                app_state_set_u8(APP_STATE_FIELD_PLANE_GPS_TIME_MINUTES, &app_state->plane_gps_time_minutes, state->gps->minutes);
+                app_state_set_u8(APP_STATE_FIELD_PLANE_GPS_TIME_SECONDS, &app_state->plane_gps_time_seconds, state->gps->seconds);
+                app_state_set_u8(APP_STATE_FIELD_PLANE_GPS_DATE_DAY, &app_state->plane_gps_date_day, state->gps->date);
+                app_state_set_u8(APP_STATE_FIELD_PLANE_GPS_DATE_MONTH, &app_state->plane_gps_date_month, state->gps->month);
+                app_state_set_u8(APP_STATE_FIELD_PLANE_GPS_DATE_YEAR, &app_state->plane_gps_date_year, state->gps->year);
+
                 app_state_end_update();
 
                 LOG_D(TAG, "Plane: Lat=%.6f, Lon=%.6f, Alt=%.1f, Speed=%.1f, Course=%.1f", state->gps->latitude, state->gps->longitude, state->gps->altitude,

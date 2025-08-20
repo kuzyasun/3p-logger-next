@@ -5,9 +5,6 @@
 #include "protocols/protocol_parser.h"  // Include the common interface
 #include "util/time-util.h"
 
-// Forward declaration
-typedef struct atp_s atp_t;
-
 // Frame IDs
 #define GPS_ID 0x02
 #define BATTERY_ID 0x08
@@ -88,8 +85,7 @@ typedef struct crsf_state_s {
 typedef struct {
     protocol_parser_t parser;
     crsf_state_t state;
-    atp_t *atp_ctx;
 } crsf_parser_t;
 
-void crsf_parser_init(crsf_parser_t *instance, atp_t *atp_ctx);
+void crsf_parser_init(crsf_parser_t *instance);
 bool crsf_process_frame(crsf_state_t *state, const uint8_t *frame_data, size_t total_frame_len);

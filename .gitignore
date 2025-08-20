@@ -1,7 +1,3 @@
 temp
 .pio
-DTrack/dependencies.lock
-DTrack/compile_commands.json
-DTrack.code-workspace
-ota-server/www/vid1.mp4
-ota-server/www/vid2.mp4
+managed_components
