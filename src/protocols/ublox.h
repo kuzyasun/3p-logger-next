@@ -18,6 +18,12 @@ typedef struct {
     int buf_pos;
 
     time_micros_t last_frame_recv;
+    uint8_t step;
+    uint16_t payload_length;
+    uint8_t msg_class;
+    uint8_t msg_id;
+    uint8_t ck_a;
+    uint8_t ck_b;
 } ublox_state_t;
 
 // The public-facing struct for the entire UBLOX module
