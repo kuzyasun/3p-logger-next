@@ -1,0 +1,311 @@
+Of course. Here is a clean, detailed, step-by-step plan written from scratch, showing what to add to each file to implement the desired functionality.
+
+The plan is in English and raw text format as requested.
+
+Plaintext
+
+### Step 1: Modify `io_manager.h`
+
+First, we will update the header for the IO Manager. We need to add a pointer to the `io_uart_t` struct that will link it to a specific protocol parser. We also need to add the function prototype for our new configuration function.
+
+```c
+/* FILE: io_manager.h */
+
+#pragma once
+
+#include <hal/gpio_base.h>
+#include "protocols/protocol.h"
+#include "protocols/protocol_parser.h"
+#include "serial.h"
+#include "util/time-util.h"
+
+// --- ADD THIS ---
+// Forward declaration of app_logic_s to avoid circular header dependencies.
+// This allows us to use a pointer to it in our function prototype.
+struct app_logic_s;
+
+typedef struct io_uart_s {
+    uint8_t com;
+    bool io_runing;
+    bool invalidate_input;
+    bool invalidate_output;
+    hal_gpio_t gpio_tx;
+    hal_gpio_t gpio_rx;
+    int baudrate;
+    protocol_e protocol;
+    protocol_io_type_e io_type;
+
+    serial_port_t *serial_port;
+
+    // --- ADD THIS ---
+    // This pointer will hold the active parser for this specific UART instance.
+    protocol_parser_t *parser;
+
+} io_uart_t;
+
+typedef struct io_manager_s {
+    io_uart_t uart1;
+    io_uart_t uart2;
+} io_manager_t;
+
+void io_manager_init(io_manager_t *iom);
+
+// --- ADD THIS FUNCTION PROTOTYPE ---
+// This function will be responsible for setting up a UART with a specific parser.
+void io_manager_configure_uart(
+    io_manager_t *iom,
+    io_uart_t *uart,
+    struct app_logic_s *app_logic,
+    protocol_e protocol,
+    int baudrate,
+    hal_gpio_t rx_pin,
+    hal_gpio_t tx_pin
+);
+
+void io_manager_task(void *arg);
+Step 2: Implement Logic in io_manager.c
+Next, we'll add the core logic to the IO Manager's source file. This includes the generic callback for incoming bytes and the implementation of the io_manager_configure_uart function that ties everything together.
+
+C
+
+/* FILE: io_manager.c */
+
+#include "io_manager.h"
+
+#include <errno.h>
+#include <log.h>
+#include <stdlib.h>
+#include <string.h>
+#include <target.h>
+
+#include "app_state.h"
+// --- ADD THIS INCLUDE ---
+// Include app_logic.h to get the definition of the app_logic_t struct,
+// which is needed to access the parser instances.
+#include "app_logic.h"
+
+static const char *TAG = "IOM";
+
+// --- ADD THIS STATIC CALLBACK FUNCTION ---
+/**
+ * @brief This callback is invoked by the serial driver for every byte received.
+ *
+ * @param port The serial port instance that received the byte (unused here).
+ * @param b The byte that was received.
+ * @param user_data A pointer to our io_uart_t struct for this port.
+ */
+static void uart_byte_received_callback(const serial_port_t *port, uint8_t b, void *user_data) {
+    // Cast user_data back to our UART struct
+    io_uart_t *uart = (io_uart_t *)user_data;
+
+    // Check if a valid parser is assigned and if it has the process_byte method
+    if (uart && uart->parser && uart->parser->vtable.process_byte) {
+        // Feed the byte directly into the assigned protocol parser
+        uart->parser->vtable.process_byte(uart->parser->state, b);
+    }
+}
+
+void io_manager_init(io_manager_t *iom) {
+    memset(iom, 0, sizeof(*iom));
+    LOG_I(TAG, "IO Manager Initialized");
+}
+
+// --- ADD THIS ENTIRE FUNCTION IMPLEMENTATION ---
+/**
+ * @brief Configures and opens a UART port with a specific protocol parser.
+ */
+void io_manager_configure_uart(
+    io_manager_t *iom,
+    io_uart_t *uart,
+    struct app_logic_s *app_logic,
+    protocol_e protocol,
+    int baudrate,
+    hal_gpio_t rx_pin,
+    hal_gpio_t tx_pin
+) {
+    if (!uart || !app_logic) {
+        LOG_E(TAG, "Invalid arguments for UART configuration.");
+        return;
+    }
+
+    // 1. Select the correct parser instance from the app_logic struct
+    switch (protocol) {
+        case PROTOCOL_CRSF:
+            uart->parser = &app_logic->crsf_parser.parser;
+            break;
+        case PROTOCOL_MAVLINK:
+            uart->parser = &app_logic->mavlink_parser.parser;
+            break;
+        case PROTOCOL_NMEA:
+            uart->parser = &app_logic->nmea_parser.parser;
+            break;
+        case PROTOCOL_UBLOX:
+            uart->parser = &app_logic->ublox_parser.parser;
+            break;
+        case PROTOCOL_MSP:
+            uart->parser = &app_logic->msp_parser.parser;
+            break;
+        // Add cases for other protocols like MSP_V2 as needed
+        default:
+            uart->parser = NULL;
+            LOG_W(TAG, "No parser assigned for protocol ID: %d", protocol);
+            break;
+    }
+
+    // 2. Initialize the selected parser if it exists and hasn't been initialized yet
+    if (uart->parser && !uart->parser->is_initialized) {
+        if (uart->parser->vtable.init) {
+            uart->parser->vtable.init(uart->parser->state);
+            uart->parser->is_initialized = true;
+        }
+    }
+
+    // 3. Prepare the serial port hardware configuration
+    uart->protocol = protocol;
+    uart->baudrate = baudrate;
+    uart->gpio_rx = rx_pin;
+    uart->gpio_tx = tx_pin;
+
+    serial_port_config_t serial_config = {
+        .baud_rate = uart->baudrate,
+        .rx_pin = uart->gpio_rx,
+        .tx_pin = uart->gpio_tx,
+        .rx_buffer_size = 1024,
+        .tx_buffer_size = 256,
+        .inverted = false,
+        .parity = SERIAL_PARITY_DISABLE,
+        .stop_bits = SERIAL_STOP_BITS_1,
+        .byte_callback = uart_byte_received_callback, // <-- Set our callback function
+        .byte_callback_data = uart,                  // <-- Pass the uart struct to the callback
+    };
+
+    // 4. Open the serial port with the specified configuration
+    uart->serial_port = serial_port_open(&serial_config);
+
+    if (uart->serial_port) {
+        uart->io_runing = true;
+        LOG_I(TAG, "Successfully configured UART with protocol %d on RX:%d/TX:%d at %d baud.",
+            protocol, rx_pin, tx_pin, baudrate);
+    } else {
+        uart->io_runing = false;
+        LOG_E(TAG, "Failed to open serial port for protocol %d.", protocol);
+    }
+}
+
+void io_manager_task(void *arg) {
+    io_manager_t *iom = (io_manager_t *)arg;
+    
+    // This task no longer needs to poll the UART.
+    // It can be used for other IO-related tasks in the future.
+    while (true) {
+        vTaskDelay(pdMS_TO_TICK(1000));
+    }
+}
+Step 3: Integrate the Configuration Call into app_logic.c
+Now, we will make the app_logic module responsible for configuring its own I/O. We'll call the new function from app_logic_init.
+
+C
+
+/* FILE: app_logic.c */
+
+#include "app_logic.h"
+
+#include <esp_heap_caps.h>
+#include <esp_task_wdt.h>
+#include <esp_timer.h>
+#include <log.h>
+#include <stdlib.h>
+#include <string.h>
+// --- ADD THESE INCLUDES ---
+#include <target.h>
+#include "serial.h" // For SERIAL_UNUSED_GPIO
+#include "io/io_manager.h"
+
+#include "app_commands.h"
+#include "app_state.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
+#include "platform/system.h"
+
+
+static const char *TAG = "APPL";
+
+static QueueHandle_t g_command_queue;
+
+void app_logic_init(app_logic_t *app, io_manager_t *io_manager, led_module_t *led_module) {
+    app->io_manager = io_manager;
+    app->led_module = led_module;
+
+    g_command_queue = xQueueCreate(20, sizeof(app_command_t));
+
+    // --- ADD THIS CONFIGURATION BLOCK ---
+    // Here, the application logic configures its required I/O ports upon initialization.
+    // This example hardcodes the configuration for UART1 to use the CRSF protocol.
+    // In a real application, this could be loaded from settings.
+    LOG_I(TAG, "Configuring IO peripherals...");
+    io_manager_configure_uart(
+        app->io_manager,            // The io_manager instance
+        &app->io_manager->uart1,    // The specific UART to configure
+        app,                        // The app_logic instance, which contains the parsers
+        PROTOCOL_CRSF,              // The desired protocol (from protocol.h)
+        420000,                     // Baud rate for CRSF
+        UART1_RX_IN_GPIO,           // RX pin (from target.h)
+        SERIAL_UNUSED_GPIO          // No TX pin is used for this input
+    );
+    // ------------------------------------
+
+    LOG_I(TAG, "Application Logic Initialized.");
+}
+
+// ... rest of the file remains unchanged ...
+Step 4: Verify main.c
+Finally, ensure main.c is clean and only calls the high-level initialization functions. It should not contain any direct I/O configuration logic.
+
+C
+
+/* FILE: main.c */
+
+#include <log.h>
+#include <target.h>
+#include <version.h>
+
+#include "app_logic.h"
+#include "esp_attr.h"
+#include "esp_log_level.h"
+#include "esp_rom_sys.h"
+#include "esp_system.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "hal/gpio.h"
+#include "io/io_manager.h"
+#include "platform/system.h"
+#include "soc/rtc_cntl_reg.h"
+#include "soc/soc.h"
+
+// ... (reboot_to_download_mode and usb_boot_cmd_task functions remain unchanged) ...
+
+static const char *TAG = "Main";
+
+static io_manager_t io_manager;
+static app_logic_t app_logic;
+static led_module_t led_module;
+
+void app_main() {
+    usb_boot_cmd_start();
+
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    // ... (log level and chip info logging remain unchanged) ...
+
+    // Initialize main modules.
+    io_manager_init(&io_manager);
+    led_module_init(&led_module);
+
+    // Call app_logic_init. It will now handle the UART configuration internally.
+    app_logic_init(&app_logic, &io_manager, &led_module);
+    
+    // Start all application tasks.
+    app_logic_start_all_tasks(&app_logic);
+}
+This completes the full plan. After applying these changes, the system will be configured at startup to route all incoming bytes from UART1_RX_IN_GPIO directly to the CRSF protocol parser in an efficient, callback-driven manner.
