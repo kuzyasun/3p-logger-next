@@ -117,7 +117,7 @@ esp_err_t app_logic_start_all_tasks(app_logic_t *app) {
     }
 
     // Start LED blink task
-    BaseType_t led_ret = xTaskCreatePinnedToCore(led_blink_task, "LED_BLINK", 2048, app->led_module, TASK_PRIORITY_DEFAULT, &app->led_task_handle, 0);
+    BaseType_t led_ret = xTaskCreatePinnedToCore(led_blink_task, "LED_BLINK", 4096, app->led_module, TASK_PRIORITY_DEFAULT, &app->led_task_handle, 0);
     if (led_ret != pdPASS) {
         LOG_E(TAG, "Failed to create LED blink task");
         result = ESP_FAIL;

@@ -101,6 +101,16 @@ uint32_t system_get_cpu_cores(void) {
     return chip_info.cores;
 }
 
+uint32_t system_get_flash_size_bytes(void) {
+    uint32_t flash_size;
+    esp_err_t ret = esp_flash_get_size(NULL, &flash_size);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get flash size: %s", esp_err_to_name(ret));
+        return 0;
+    }
+    return flash_size;
+}
+
 #define BUTTON_SYSTEM_GPIO BUTTON_ENTER_GPIO
 
 float system_temperature(void) {

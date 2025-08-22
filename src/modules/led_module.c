@@ -12,14 +12,14 @@ void led_blink_task(void *pvParameters) {
     while (1) {
         // Turn LED on
         hal_gpio_set_level(BOARDLED_PIN, HAL_GPIO_HIGH);
-        LOG_I(TAG, "LED ON");
+        // LOG_I(TAG, "LED ON");  // Commented out to reduce stack usage
 
         // Wait 500ms
         vTaskDelay(500 / portTICK_PERIOD_MS);
 
         // Turn LED off
         hal_gpio_set_level(BOARDLED_PIN, HAL_GPIO_LOW);
-        LOG_I(TAG, "LED OFF");
+        LOG_I(TAG, "LED OFF");  // Commented out to reduce stack usage
 
         // Wait 500ms (total 1 second cycle)
         vTaskDelay(500 / portTICK_PERIOD_MS);

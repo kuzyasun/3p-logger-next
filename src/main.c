@@ -5,6 +5,7 @@
 #include "app_logic.h"
 #include "esp_attr.h"
 #include "esp_log_level.h"
+#include "esp_rom_sys.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -14,14 +15,29 @@
 #include "soc/rtc_cntl_reg.h"
 #include "soc/soc.h"
 
-static inline void reboot_to_download_mode(void) {
-    // Примусити ROM-завантажувач на наступний рестарт
-    REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
-    esp_restart();
+IRAM_ATTR static void reboot_to_download_mode(void) {
+    // дати консолі доблювати буфер, щоб "BOOT\n" гарантовано пішов
+    fflush(stdout);
+    vTaskDelay(pdMS_TO_TICKS(10));
+
+    // 1) Дописуємо біт (не перезаписуємо увесь регістр!)
+    REG_SET_BIT(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
+
+    // 2) Коротка пауза, щоб біт гарантовано «сів»
+    for (volatile int i = 0; i < 10000; ++i) {
+    }
+
+    // 3) Чистий ROM-ресет → ROM бачить FORCE_DOWNLOAD_BOOT
+    esp_rom_software_reset_system();
+
+    while (true) {
+    }  // на випадок, якщо компілятор спробує "піти далі"
 }
 
 // SET BOOT MODE
 static void usb_boot_cmd_task(void *arg) {
+    vTaskDelay(pdMS_TO_TICKS(3000));
+
     const char *MAGIC = "BOOT\n";  // що надсилатиме PlatformIO
     char line[16];
     int idx = 0;
@@ -46,7 +62,10 @@ static void usb_boot_cmd_task(void *arg) {
     }
 }
 
-void usb_boot_cmd_start(void) { xTaskCreatePinnedToCore(usb_boot_cmd_task, "usb_boot_cmd", 3072, NULL, 1, NULL, tskNO_AFFINITY); }
+void usb_boot_cmd_start(void) {
+    REG_CLR_BIT(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
+    xTaskCreatePinnedToCore(usb_boot_cmd_task, "usb_boot_cmd", 3072, NULL, 1, NULL, tskNO_AFFINITY);
+}
 
 static const char *TAG = "Main";
 
@@ -75,6 +94,7 @@ void app_main() {
     LOG_I(TAG, "ESP32 Chip Revision: %d", system_get_chip_revision());
     LOG_I(TAG, "ESP32 CPU Frequency: %lu MHz", system_get_cpu_frequency_mhz());
     LOG_I(TAG, "ESP32 CPU Cores: %lu", system_get_cpu_cores());
+    LOG_I(TAG, "ESP32 Flash Size: %lu", system_get_flash_size_bytes());
 
     io_manager_init(&io_manager);
     led_module_init(&led_module);

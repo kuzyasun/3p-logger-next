@@ -1,9 +1,6 @@
-#pragma once
+#ifndef _VERSION_H_
+#define _VERSION_H_
+
 #define FIRMWARE_VERSION "1.0.0"
 
-#ifndef BUILD_TIMESTAMP
-#define BUILD_TIMESTAMP "Unknown"
-#endif
-#ifndef GIT_HASH
-#define GIT_HASH "Unknown"
-#endif
+#endif  // _VERSION_H_

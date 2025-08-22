@@ -74,4 +74,5 @@ const char *system_get_esp32_model(void);
 uint16_t system_get_chip_revision(void);
 uint32_t system_get_cpu_frequency_mhz(void);
 uint32_t system_get_cpu_cores(void);
+uint32_t system_get_flash_size_bytes(void);
 void system_get_device_info(device_info_t *info);

@@ -4,10 +4,16 @@
 - then connect USB cable to board
 - release boot button
 - download Zadig https://zadig.akeo.ie/
-- oped Zadig and select "Options->List all devices", select ESP32-S2 (Interface 0),  select "WinUsb" install
-- select select ESP32-S2 (Interface 2) "USB serial (CDC)"  driver,  Install
+- oped Zadig and select "Options->List all devices", select ESP32-S2 (Interface 0),  select "USB Serial (CDC)" install
+- select select ESP32-S2 (Interface 2) "WinUSB"  driver,  Install
 - reboot
-- select new COM port for firmware upload in platformio
+- do the same for regular boar mode
+- switch board mode to boot
+- build project
+- select COM port in platform io
+- upload
+- reset
+- next Uploads and monitor should automatically upload and listen serial monitor
 
 
  to run menu config 

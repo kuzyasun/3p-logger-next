@@ -3,22 +3,21 @@ import subprocess
 import re
 from datetime import datetime
 import sys
-
+from SCons.Script import Import, BUILD_TARGETS
+env = DefaultEnvironment()
 def set_build_env_variables():
-    try:
-        # ДОДАНО: cwd='..' вказує, що команду треба виконати у батьківській папці
+    try:        
         git_hash = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"], 
             stdout=subprocess.PIPE, 
             text=True, 
             check=True,
-            cwd='..' 
+            cwd='./' 
         ).stdout.strip()
     except Exception as e:
-        print(f"Could not get git hash: {e}")
+        print(f"[pre] Could not get git hash: {e}")
         git_hash = "N/A"
-
-    # Читаємо версію з файлу version.h (шлях відносно скрипта, тому не міняємо)
+    
     version = "N/A"
     try:
         with open("./include/version.h", "r") as f:
@@ -27,20 +26,28 @@ def set_build_env_variables():
                     version = line.split('"')[1]
                     break
     except FileNotFoundError:
-        print("Warning: ./include/version.h not found.")
-
-    # Отримуємо поточну дату і час
+        print("[pre] Warning: ./include/version.h not found.")
+    
     build_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Встановлюємо змінні для C++ коду
-    os.environ['PIO_VERSION'] = version
-    os.environ['GIT_HASH'] = git_hash
-    os.environ['BUILD_TIMESTAMP'] = build_timestamp  
+    print(f"[pre] PIO_VERSION: {version}")
+    print(f"[pre] GIT_HASH: {git_hash}")
+    print(f"[pre] BUILD_TIMESTAMP: {build_timestamp}")
+    env.Append(
+        CPPDEFINES=[
+            ("FIRMWARE_VERSION", '\\"' + version + '\\"'),
+            ("GIT_HASH", '\\"' + git_hash + '\\"'),
+            ("BUILD_TIMESTAMP", '\\"' + build_timestamp + '\\"')
+        ]
+    )
 
-pio_command = os.environ.get('PIOCOMMAND')
+
 valid_commands = ['build', 'run', 'upload', 'test']
 
+targets = [str(t) for t in BUILD_TARGETS]
+print(f"targets: {targets}")
 
-# if pio_command in valid_commands:
-    # set_build_env_variables()
-set_build_env_variables()
+if "upload" in targets or "build" in targets:    
+    set_build_env_variables()
+else:
+    print("[pre] skip version script")
