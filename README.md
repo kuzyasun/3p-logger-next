@@ -1,4 +1,6 @@
 
+## Update repo and update submodules
+
 ## Upload and monitor by USB
 - press boot button
 - then connect USB cable to board

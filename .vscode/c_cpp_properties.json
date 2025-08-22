@@ -184,6 +184,8 @@
                 "C:/Users/smartyniuk/.platformio/packages/framework-espidf/components/touch_element/include",
                 "C:/Users/smartyniuk/.platformio/packages/framework-espidf/components/usb/include",
                 "C:/Users/smartyniuk/.platformio/packages/framework-espidf/components/wifi_provisioning/include",
+                "C:/projects/3p/3p-logger-next/components",
+                "c:/projects/3p/3p-logger-next/components/mavlink",
                 ""
             ],
             "browse": {
@@ -365,6 +367,8 @@
                     "C:/Users/smartyniuk/.platformio/packages/framework-espidf/components/touch_element/include",
                     "C:/Users/smartyniuk/.platformio/packages/framework-espidf/components/usb/include",
                     "C:/Users/smartyniuk/.platformio/packages/framework-espidf/components/wifi_provisioning/include",
+                    "C:/projects/3p/3p-logger-next/components",
+                    "c:/projects/3p/3p-logger-next/components/mavlink",
                     ""
                 ]
             },

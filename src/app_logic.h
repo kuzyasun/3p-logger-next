@@ -6,6 +6,7 @@
 #include "io/io_manager.h"
 #include "modules/led_module.h"
 #include "protocols/crsf.h"
+#include "protocols/mavlink.h"
 #include "protocols/msp.h"
 #include "protocols/msp_v2.h"
 #include "protocols/nmea.h"
@@ -30,6 +31,7 @@ typedef struct app_logic_s {
     ublox_parser_t ublox_parser;
     msp_parser_t msp_parser;
     msp_v2_parser_t msp_v2_parser;
+    mavlink_parser_t mavlink_parser;
 
 } app_logic_t;
 

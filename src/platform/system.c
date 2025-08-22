@@ -143,7 +143,7 @@ void system_shutdown(void) {
     ESP_ERROR_CHECK(esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON));
     ESP_ERROR_CHECK(gpio_pulldown_dis(BUTTON_SYSTEM_GPIO));
     ESP_ERROR_CHECK(gpio_pullup_en(BUTTON_SYSTEM_GPIO));
-    ESP_ERROR_CHECK(esp_sleep_enable_ext1_wakeup(1 << BUTTON_SYSTEM_GPIO, ESP_EXT1_WAKEUP_ALL_LOW));
+    ESP_ERROR_CHECK(esp_sleep_enable_ext1_wakeup(1 << BUTTON_SYSTEM_GPIO, ESP_EXT1_WAKEUP_ANY_LOW));
 #endif
 
     // TODO: Wake up if the 5V power is connected.
