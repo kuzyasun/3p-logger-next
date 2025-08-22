@@ -41,13 +41,20 @@ def set_build_env_variables():
         ]
     )
 
+def should_run():
+    # Якщо користувач не задав цілей - це стандартна збірка (buildprog)
+    bt = {str(t) for t in BUILD_TARGETS}
+    ct = {str(t) for t in COMMAND_LINE_TARGETS}
+    print(f"targets: {sorted(bt)}")
+    print(f"Command line targets: {sorted(ct)}")
 
-valid_commands = ['build', 'run', 'upload', 'test']
+    if not bt and not ct:
+        return True  # звичайний pio run/pio build
 
-targets = [str(t) for t in BUILD_TARGETS]
-print(f"targets: {targets}")
+    wanted = {"build", "buildprog", "upload", "program", "run", "test"}
+    return bool(wanted & bt) or bool(wanted & ct)
 
-if "upload" in targets or "build" in targets:    
+if should_run():
     set_build_env_variables()
 else:
     print("[pre] skip version script")
