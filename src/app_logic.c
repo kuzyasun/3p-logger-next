@@ -17,12 +17,14 @@
 #include "io/io_manager.h"
 #include "io/serial.h"
 #include "modules/accel_module.h"
+#include "modules/logger_module.h"
 #include "platform/system.h"
 
 static const char *TAG = "APPL";
 
 static QueueHandle_t g_command_queue;
 extern accel_module_t g_accel_module;
+extern logger_module_t g_logger_module;
 
 void app_logic_init(app_logic_t *app, io_manager_t *io_manager, led_module_t *led_module) {
     app->io_manager = io_manager;
@@ -192,6 +194,16 @@ esp_err_t app_logic_start_all_tasks(app_logic_t *app) {
         result = ESP_FAIL;
     } else {
         LOG_I(TAG, "accel_module_task created successfully");
+    }
+
+    // Start Logger task
+    logger_module_create_task(&g_logger_module);
+    app->logger_task_handle = g_logger_module.task_handle;
+    if (app->logger_task_handle == NULL) {
+        LOG_E(TAG, "Failed to create logger_task");
+        result = ESP_FAIL;
+    } else {
+        LOG_I(TAG, "logger_task created successfully");
     }
 
     // Start test mode cycle task
