@@ -8,13 +8,11 @@ This plan outlines the required changes to integrate the LIS3DH accelerometer dr
 ### PRE-REQUISITES: FILE PLACEMENT
 ---
 
-1.  **Place LIS3DH Driver Files:**
-    * Copy `lis3dh_reg.h` and `lis3dh_reg.c` into a new directory, for example: `drivers/st/lis3dh/`.
+1.  **Verify LIS3DH Driver Library:**
+    * The LIS3DH driver is available under `lib/stm-lis3dh/` and will be built automatically by PlatformIO.
 
 2.  **Update Build System:**
-    * Modify your `CMakeLists.txt` or build configuration.
-    * Add the new driver directory (`drivers/st/lis3dh/`) to the include paths.
-    * Add `drivers/st/lis3dh/lis3dh_reg.c` to the list of source files to be compiled.
+    * No additional include paths or source entries are required when using the library in `lib/`.
 
 ---
 ### STEP 1: CREATE THE NEW ACCELEROMETER MODULE (`accel_module`)
@@ -29,7 +27,7 @@ This file will define the public API and data structures for the module.
 
 #pragma once
 
-#include "drivers/st/lis3dh/lis3dh_reg.h"
+#include "lis3dh_reg.h"
 #include "hal/spi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -139,9 +137,9 @@ static void accel_module_task(void *arg) {
                 // TODO: Update app_state. Need to add fields for acceleration.
                 // Example:
                 // app_state_begin_update();
-                // app_state_set_i16(APP_STATE_FIELD_PLANE_ACCEL_X, &state->plane_accel_x, raw_accel[0]);
-                // app_state_set_i16(APP_STATE_FIELD_PLANE_ACCEL_Y, &state->plane_accel_y, raw_accel[1]);
-                // app_state_set_i16(APP_STATE_FIELD_PLANE_ACCEL_Z, &state->plane_accel_z, raw_accel[2]);
+                // app_state_set_i16(APP_STATE_FIELD_ACCEL_X, &state->accel_x, raw_accel[0]);
+                // app_state_set_i16(APP_STATE_FIELD_ACCEL_Y, &state->accel_y, raw_accel[1]);
+                // app_state_set_i16(APP_STATE_FIELD_ACCEL_Z, &state->accel_z, raw_accel[2]);
                 // app_state_end_update();
                 
                 LOG_D(TAG, "Accel Raw X:%d Y:%d Z:%d", raw_accel[0], raw_accel[1], raw_accel[2]);
@@ -230,15 +228,15 @@ C
 
 // in app_state_field_mask_e enum:
 // ... (previous fields)
-APP_STATE_FIELD_PLANE_ACCEL_X = (1ULL << 61),
-APP_STATE_FIELD_PLANE_ACCEL_Y = (1ULL << 62),
-APP_STATE_FIELD_PLANE_ACCEL_Z = (1ULL << 63),
+APP_STATE_FIELD_ACCEL_X = (1ULL << 61),
+APP_STATE_FIELD_ACCEL_Y = (1ULL << 62),
+APP_STATE_FIELD_ACCEL_Z = (1ULL << 63),
 
 // in app_state_s struct:
 // ... (previous fields)
-int16_t plane_accel_x; // Raw accelerometer data X
-int16_t plane_accel_y; // Raw accelerometer data Y
-int16_t plane_accel_z; // Raw accelerometer data Z
+int16_t accel_x; // Raw accelerometer data X
+int16_t accel_y; // Raw accelerometer data Y
+int16_t accel_z; // Raw accelerometer data Z
 
 2.2. Modify app_logic.h
 
@@ -329,13 +327,13 @@ set(SOURCES
     "modules/led_module.c"
     "modules/accel_module.c"  # <-- ADD THIS
     ...
-    "drivers/st/lis3dh/lis3dh_reg.c" # <-- ADD THIS
+    # Driver is built from lib/stm-lis3dh automatically
 )
 
 # Ensure the drivers directory is in the include path
 target_include_directories(${COMPONENT_TARGET} PUBLIC
     ...
-    "drivers/st/lis3dh" # <-- ADD THIS if not covered by a general "drivers" path
+    # No extra include paths needed for LIS3DH driver
 )
 FINAL CHECKS
 Verify the SPI bus number (SPI2_HOST, SPI3_HOST, etc.) is correct for your hardware target.

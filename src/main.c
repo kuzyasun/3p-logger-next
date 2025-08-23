@@ -13,6 +13,7 @@
 #include "freertos/task.h"
 #include "hal/gpio.h"
 #include "io/io_manager.h"
+#include "modules/accel_module.h"
 #include "platform/system.h"
 #include "soc/rtc_cntl_reg.h"
 #include "soc/soc.h"
@@ -74,6 +75,7 @@ static const char *TAG = "Main";
 static io_manager_t io_manager;
 static app_logic_t app_logic;
 static led_module_t led_module;
+static accel_module_t g_accel_module;
 
 void app_main() {
     usb_boot_cmd_start();
@@ -101,6 +103,21 @@ void app_main() {
     app_state_init();  // Initialize app state first
     io_manager_init(&io_manager);
     led_module_init(&led_module);
+
+    // Initialize SPI bus for accelerometer
+    hal_spi_bus_init(SPI2_HOST, ACC_SPI_MISO_GPIO, ACC_SPI_MOSI_GPIO, ACC_SPI_CLK_GPIO);
+
+    // Initialize Accelerometer
+    accel_config_t accel_cfg = {
+        .output_data_rate = LIS3DH_ODR_100Hz,
+        .full_scale = LIS3DH_2g,
+        .op_mode = LIS3DH_HR_12bit,
+        .spi_bus = SPI2_HOST,
+        .cs_pin = ACC_SPI_CS_GPIO,
+    };
+    if (accel_module_init(&g_accel_module, &accel_cfg) != HAL_ERR_NONE) {
+        LOG_E(TAG, "Failed to initialize accelerometer module. Entering error state.");
+    }
 
     app_logic_init(&app_logic, &io_manager, &led_module);
     app_logic_start_all_tasks(&app_logic);
