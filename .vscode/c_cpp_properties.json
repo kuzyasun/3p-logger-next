@@ -10,6 +10,7 @@
             "includePath": [
                 "c:/projects/3p/3p-logger-next/include",
                 "c:/projects/3p/3p-logger-next/src",
+                "c:/projects/3p/3p-logger-next/lib/stm-lis3dh",
                 "c:/projects/3p/3p-logger-next/lib/hal-common/include",
                 "c:/projects/3p/3p-logger-next/lib/hal-common",
                 "c:/projects/3p/3p-logger-next/lib/hal-esp32/include",
@@ -184,9 +185,10 @@
                 "C:/Users/smartyniuk/.platformio/packages/framework-espidf/components/touch_element/include",
                 "C:/Users/smartyniuk/.platformio/packages/framework-espidf/components/usb/include",
                 "C:/Users/smartyniuk/.platformio/packages/framework-espidf/components/wifi_provisioning/include",
+                "C:/projects/3p/3p-logger-next/src",
                 "C:/projects/3p/3p-logger-next/components",
                 "c:/projects/3p/3p-logger-next/components/mavlink",
-                "c:/projects/3p/3p-logger-next/lib/stm-lis3dh",
+                "c:/projects/3p/3p-logger-next/lib/stm-lis2dh12",
                 ""
             ],
             "browse": {
@@ -194,6 +196,7 @@
                 "path": [
                     "c:/projects/3p/3p-logger-next/include",
                     "c:/projects/3p/3p-logger-next/src",
+                    "c:/projects/3p/3p-logger-next/lib/stm-lis3dh",
                     "c:/projects/3p/3p-logger-next/lib/hal-common/include",
                     "c:/projects/3p/3p-logger-next/lib/hal-common",
                     "c:/projects/3p/3p-logger-next/lib/hal-esp32/include",
@@ -368,9 +371,10 @@
                     "C:/Users/smartyniuk/.platformio/packages/framework-espidf/components/touch_element/include",
                     "C:/Users/smartyniuk/.platformio/packages/framework-espidf/components/usb/include",
                     "C:/Users/smartyniuk/.platformio/packages/framework-espidf/components/wifi_provisioning/include",
+                    "C:/projects/3p/3p-logger-next/src",
                     "C:/projects/3p/3p-logger-next/components",
                     "c:/projects/3p/3p-logger-next/components/mavlink",
-                    "c:/projects/3p/3p-logger-next/lib/stm-lis3dh",
+                    "c:/projects/3p/3p-logger-next/lib/stm-lis2dh12",
                     ""
                 ]
             },
