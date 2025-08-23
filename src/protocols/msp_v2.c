@@ -226,6 +226,23 @@ static void msp_v2_process_packet(msp_v2_state_t *state, uint16_t cmd, const uin
             break;
         }
 
+        case MSP2_RC_CHANNELS: {
+            // Пакет містить масив значень каналів, кожен розміром 2 байти (uint16_t).
+            // Зазвичай передається 16 або більше каналів.
+            if (len >= 32) {  // Перевіряємо, чи є дані хоча б для 16 каналів
+                uint16_t rc_channels[16];
+                memcpy(rc_channels, payload, sizeof(rc_channels));
+
+                app_state_begin_update();
+                // Копіюємо дані в app_state (якщо там є відповідне поле)
+                // memcpy(app_state->plane_rc_channels, rc_channels, sizeof(rc_channels));
+                app_state_end_update();
+
+                LOG_D(TAG, "RC Channels: CH1=%u, CH2=%u, CH3=%u, CH4=%u ...", rc_channels[0], rc_channels[1], rc_channels[2], rc_channels[3]);
+            }
+            break;
+        }
+
         default:
             LOG_D(TAG, "Unhandled cmd 0x%04X with len %u", cmd, len);
             break;

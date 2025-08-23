@@ -117,19 +117,87 @@ static void mavlink_parser_internal_destroy(void *parser_state) {
 
 // Internal helper function: Process a complete MAVLink frame
 static bool mavlink_process_frame(mavlink_state_t *state, const uint8_t *frame_data, size_t frame_length) {
-    if (!frame_data || frame_length < 10) {
+    if (!frame_data || frame_length < 8) {
         return false;
     }
 
-    // Extract basic MAVLink frame information
-    uint8_t start_byte = frame_data[0];
-    uint8_t payload_length = frame_data[1];
-    uint8_t sequence = frame_data[2];
-    uint8_t system_id = frame_data[3];
-    uint8_t component_id = frame_data[4];
-    uint8_t message_id = frame_data[5];
+    mavlink_message_t msg;
+    mavlink_status_t status;
+    bool msg_received = false;
 
-    LOG_D(TAG, "frame: start=0x%02X, len=%d, seq=%d, sys=%d, comp=%d, msg=%d", start_byte, payload_length, sequence, system_id, component_id, message_id);
+    // Спробуємо розпарсити кожен байт кадру через бібліотеку MAVLink
+    // Це надійний спосіб, що також перевіряє контрольну суму (CRC)
+    for (size_t i = 0; i < frame_length; ++i) {
+        if (mavlink_parse_char(MAVLINK_COMM_0, frame_data[i], &msg, &status)) {
+            msg_received = true;
+            break;  // Повідомлення успішно розпарсено
+        }
+    }
+
+    if (!msg_received) {
+        LOG_W(TAG, "Failed to parse MAVLink frame or CRC mismatch");
+        return false;
+    }
+
+    app_state_t *app_state = app_state_get_instance();
+
+    LOG_D(TAG, "Received MAVLink MSG ID: %d", msg.msgid);
+
+    // Обробляємо повідомлення в залежності від його ID
+    switch (msg.msgid) {
+        case MAVLINK_MSG_ID_GLOBAL_POSITION_INT: {  // ID: 33
+            mavlink_global_position_int_t pos;
+            mavlink_msg_global_position_int_decode(&msg, &pos);
+
+            // Розрахунок горизонтальної швидкості з векторів vx, vy
+            float ground_speed_mps = sqrtf((float)pos.vx * (float)pos.vx + (float)pos.vy * (float)pos.vy) / 100.0f;
+
+            app_state_begin_update();
+            app_state_set_i32(APP_STATE_FIELD_PLANE_LATITUDE, &app_state->plane_latitude, pos.lat);
+            app_state_set_i32(APP_STATE_FIELD_PLANE_LONGITUDE, &app_state->plane_longitude, pos.lon);
+            app_state_set_i32(APP_STATE_FIELD_PLANE_ALTITUDE, &app_state->plane_altitude, pos.alt / 1000);                     // в метри
+            app_state_set_i32(APP_STATE_FIELD_PLANE_BARO_ALTITUDE, &app_state->plane_baro_altitude, pos.relative_alt / 1000);  // в метри
+            app_state_set_i16(APP_STATE_FIELD_PLANE_SPEED, &app_state->plane_speed, (int16_t)(ground_speed_mps * 100));        // в см/с
+            app_state_set_i16(APP_STATE_FIELD_PLANE_HEADING, &app_state->plane_heading, pos.hdg / 100);                        // в градуси
+            app_state_end_update();
+
+            LOG_D(TAG, "GPS: Lat=%d, Lon=%d, Alt=%dm, Spd=%.2fm/s", pos.lat, pos.lon, pos.alt / 1000, ground_speed_mps);
+            break;
+        }
+
+        case MAVLINK_MSG_ID_VFR_HUD: {  // ID: 74
+            mavlink_vfr_hud_t hud;
+            mavlink_msg_vfr_hud_decode(&msg, &hud);
+
+            app_state_begin_update();
+            // hud.groundspeed в м/с, hud.alt в метрах, hud.climb в м/с
+            app_state_set_i16(APP_STATE_FIELD_PLANE_SPEED, &app_state->plane_speed, (int16_t)(hud.groundspeed * 100));  // в см/с
+            app_state_set_i32(APP_STATE_FIELD_PLANE_ALTITUDE, &app_state->plane_altitude, (int32_t)hud.alt);
+            app_state_set_i16(APP_STATE_FIELD_PLANE_VSPEED, &app_state->plane_vspeed, (int16_t)(hud.climb * 100));  // в см/с
+            app_state_set_i16(APP_STATE_FIELD_PLANE_HEADING, &app_state->plane_heading, (int16_t)hud.heading);      // в градуси
+            app_state_end_update();
+
+            LOG_D(TAG, "HUD: Alt=%.1fm, Spd=%.1fm/s, VSpd=%.1fm/s", hud.alt, hud.groundspeed, hud.climb);
+            break;
+        }
+
+        case MAVLINK_MSG_ID_RC_CHANNELS_RAW: {  // ID: 35
+            mavlink_rc_channels_raw_t rc;
+            mavlink_msg_rc_channels_raw_decode(&msg, &rc);
+
+            uint16_t rc_channels[8] = {rc.chan1_raw, rc.chan2_raw, rc.chan3_raw, rc.chan4_raw, rc.chan5_raw, rc.chan6_raw, rc.chan7_raw, rc.chan8_raw};
+
+            // Залежно від вашої реалізації app_state, тут ви можете зберегти ці значення
+            // memcpy(app_state->plane_rc_channels, rc_channels, sizeof(rc_channels));
+
+            LOG_D(TAG, "RC Raw: CH1=%u, CH2=%u, CH3=%u, CH4=%u", rc.chan1_raw, rc.chan2_raw, rc.chan3_raw, rc.chan4_raw);
+            break;
+        }
+
+        default:
+            // Це повідомлення ми не обробляємо, але воно валідне
+            return true;
+    }
 
     return true;
 }
