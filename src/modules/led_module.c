@@ -5,14 +5,14 @@
 
 static const char *TAG = "LED";
 
-// Task to blink the board LED based on app mode
+// Task to the board LED based on app mode
 void led_blink_task(void *pvParameters) {
     led_module_t *led_module = (led_module_t *)pvParameters;
 
     // Setup GPIO pin as output
     hal_gpio_setup(BOARDLED_PIN, HAL_GPIO_DIR_OUTPUT, HAL_GPIO_PULL_NONE);
 
-    LOG_I(TAG, "LED blink task started on pin %d", BOARDLED_PIN);
+    LOG_I(TAG, "LED task started on pin %d", BOARDLED_PIN);
 
     while (1) {
         // Turn LED on
@@ -25,8 +25,8 @@ void led_blink_task(void *pvParameters) {
         switch (led_module->current_mode) {
             case APP_MODE_LOGGING:
                 // Fast blink for logging mode
-                on_delay = pdMS_TO_TICKS(100);
-                off_delay = pdMS_TO_TICKS(100);
+                on_delay = pdMS_TO_TICKS(200);
+                off_delay = pdMS_TO_TICKS(200);
                 break;
             case APP_MODE_ERROR:
                 // Very fast blink for error mode
@@ -36,8 +36,8 @@ void led_blink_task(void *pvParameters) {
             case APP_MODE_IDLE:
             default:
                 // Normal blink for idle mode
-                on_delay = pdMS_TO_TICKS(500);
-                off_delay = pdMS_TO_TICKS(500);
+                on_delay = pdMS_TO_TICKS(800);
+                off_delay = pdMS_TO_TICKS(800);
                 break;
         }
 
@@ -58,7 +58,6 @@ void led_module_on_app_state_change(Notifier *notifier, Observer *observer, void
     if (*changed_mask & APP_STATE_FIELD_CURRENT_MODE) {
         app_state_t *app_state = app_state_get_instance();
         led_module->current_mode = app_state->current_mode;
-        LOG_I(TAG, "LED mode changed to: %d", led_module->current_mode);
     }
 }
 

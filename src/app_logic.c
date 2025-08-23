@@ -173,13 +173,13 @@ esp_err_t app_logic_start_all_tasks(app_logic_t *app) {
         LOG_I(TAG, "io_manager_task created successfully");
     }
 
-    // Start LED blink task
+    // Start LED task
     BaseType_t led_ret = xTaskCreatePinnedToCore(led_blink_task, "LED_BLINK", 4096, app->led_module, TASK_PRIORITY_DEFAULT, &app->led_task_handle, 0);
     if (led_ret != pdPASS) {
-        LOG_E(TAG, "Failed to create LED blink task");
+        LOG_E(TAG, "Failed to create LED task");
         result = ESP_FAIL;
     } else {
-        LOG_I(TAG, "LED blink task created successfully");
+        LOG_I(TAG, "LED task created successfully");
     }
 
     // Start test mode cycle task

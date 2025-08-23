@@ -1,0 +1,347 @@
+================================================
+STEP-BY-STEP PLAN: INTEGRATING LIS3DH ACCELEROMETER
+================================================
+
+This plan outlines the required changes to integrate the LIS3DH accelerometer driver into the existing firmware architecture.
+
+---
+### PRE-REQUISITES: FILE PLACEMENT
+---
+
+1.  **Place LIS3DH Driver Files:**
+    * Copy `lis3dh_reg.h` and `lis3dh_reg.c` into a new directory, for example: `drivers/st/lis3dh/`.
+
+2.  **Update Build System:**
+    * Modify your `CMakeLists.txt` or build configuration.
+    * Add the new driver directory (`drivers/st/lis3dh/`) to the include paths.
+    * Add `drivers/st/lis3dh/lis3dh_reg.c` to the list of source files to be compiled.
+
+---
+### STEP 1: CREATE THE NEW ACCELEROMETER MODULE (`accel_module`)
+---
+
+**1.1. Create Header File: `modules/accel_module.h`**
+
+This file will define the public API and data structures for the module.
+
+```c
+// modules/accel_module.h
+
+#pragma once
+
+#include "drivers/st/lis3dh/lis3dh_reg.h"
+#include "hal/spi.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+// Configuration structure for the LIS3DH sensor
+typedef struct {
+    lis3dh_odr_t output_data_rate;
+    lis3dh_fs_t full_scale;
+    lis3dh_op_md_t op_mode;
+    hal_spi_bus_t spi_bus;
+    hal_gpio_t cs_pin;
+} accel_config_t;
+
+// Main module state structure
+typedef struct {
+    stmdev_ctx_t driver_ctx;
+    hal_spi_device_handle_t spi_dev;
+    TaskHandle_t task_handle;
+    accel_config_t config;
+    bool initialized;
+} accel_module_t;
+
+// Public API
+hal_err_t accel_module_init(accel_module_t *module, const accel_config_t *config);
+void accel_module_create_task(accel_module_t *module);
+
+1.2. Create Source File: modules/accel_module.c
+
+This file will contain the implementation logic.
+
+C
+
+// modules/accel_module.c
+
+#include "modules/accel_module.h"
+#include "hal/spi.h"
+#include "hal/gpio.h"
+#include "app_state.h"
+#include "log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+static const char *TAG = "ACCEL";
+
+// --- Platform-specific functions to connect driver to HAL ---
+
+static int32_t platform_spi_write(void *handle, uint8_t reg, const uint8_t *bufp, uint16_t len) {
+    hal_spi_device_handle_t *dev = (hal_spi_device_handle_t *)handle;
+    
+    // For ST sensors, the MSB of the register address is used for R/W flag.
+    // Write operation: MSB = 0. SPI is full-duplex, so we don't need to set it.
+    // Multi-byte write: 6th bit = 1. The lis3dh driver handles this via auto-increment.
+    // We only need to transmit the register address first, then the data.
+    // Based on example files, no special flag is needed for the register byte itself for single write.
+    // We will use a single transmit call.
+    
+    // This is a simplified approach. A more robust one would involve two separate transmits
+    // or a custom HAL function that transmits a register address then data.
+    // For now, we assume the HAL can handle a single transaction.
+    // The driver will call this with len=1 for single-byte writes.
+    // NOTE: The LIS3DH driver does not handle the CS pin. The HAL must handle it.
+    
+    // The `hal_spi_device_transmit` expects command and address fields, which we don't use here.
+    // We must ensure the HAL sends `reg` followed by `bufp`.
+    // Let's assume we need a temporary buffer.
+    uint8_t tx_buffer[len + 1];
+    tx_buffer[0] = reg;
+    memcpy(&tx_buffer[1], bufp, len);
+    
+    return hal_spi_device_transmit(dev, 0, 0, tx_buffer, len + 1, NULL, 0);
+}
+
+static int32_t platform_spi_read(void *handle, uint8_t reg, uint8_t *bufp, uint16_t len) {
+    hal_spi_device_handle_t *dev = (hal_spi_device_handle_t *)handle;
+    
+    // Read operation: MSB = 1. Multi-byte read: 6th bit = 1.
+    uint8_t reg_with_flags = reg | 0x80;
+    if (len > 1) {
+        reg_with_flags |= 0x40;
+    }
+
+    // A robust implementation would be:
+    // 1. Transmit `reg_with_flags`
+    // 2. Receive `len` bytes
+    // Let's assume hal_spi_device_transmit can handle this. We transmit the command byte
+    // and provide a receive buffer.
+    return hal_spi_device_transmit(dev, 0, 0, &reg_with_flags, 1, bufp, len);
+}
+
+static void platform_delay(uint32_t ms) {
+    vTaskDelay(pdMS_TO_TICKS(ms));
+}
+
+// --- Module Task ---
+
+static void accel_module_task(void *arg) {
+    accel_module_t *module = (accel_module_t *)arg;
+    app_state_t *state = app_state_get_instance();
+    int16_t raw_accel[3];
+
+    while(1) {
+        uint8_t data_ready = 0;
+        lis3dh_xl_data_ready_get(&module->driver_ctx, &data_ready);
+
+        if (data_ready) {
+            if (lis3dh_acceleration_raw_get(&module->driver_ctx, raw_accel) == 0) {
+                // TODO: Update app_state. Need to add fields for acceleration.
+                // Example:
+                // app_state_begin_update();
+                // app_state_set_i16(APP_STATE_FIELD_PLANE_ACCEL_X, &state->plane_accel_x, raw_accel[0]);
+                // app_state_set_i16(APP_STATE_FIELD_PLANE_ACCEL_Y, &state->plane_accel_y, raw_accel[1]);
+                // app_state_set_i16(APP_STATE_FIELD_PLANE_ACCEL_Z, &state->plane_accel_z, raw_accel[2]);
+                // app_state_end_update();
+                
+                LOG_D(TAG, "Accel Raw X:%d Y:%d Z:%d", raw_accel[0], raw_accel[1], raw_accel[2]);
+            }
+        }
+        
+        // Wait for the next cycle. The ODR determines the data rate.
+        // We poll slightly faster than the ODR.
+        vTaskDelay(pdMS_TO_TICKS(10)); // Example: Poll at 100Hz for ODR <= 100Hz
+    }
+}
+
+// --- Public API Implementation ---
+
+hal_err_t accel_module_init(accel_module_t *module, const accel_config_t *config) {
+    module->config = *config;
+    module->initialized = false;
+
+    // 1. Configure SPI device via HAL
+    hal_spi_device_config_t spi_cfg = {
+        .clock_speed_hz = 4 * 1000 * 1000, // 4 MHz
+        .spi_mode = 0, // LIS3DH supports mode 0 and 3
+        .cs = module->config.cs_pin,
+        .command_bits = 0,
+        .address_bits = 0,
+    };
+    
+    if (hal_spi_bus_add_device(module->config.spi_bus, &spi_cfg, &module->spi_dev) != HAL_ERR_NONE) {
+        LOG_E(TAG, "Failed to add SPI device");
+        return HAL_ERR_FAILED;
+    }
+    
+    // 2. Setup driver context
+    module->driver_ctx.write_reg = platform_spi_write;
+    module->driver_ctx.read_reg = platform_spi_read;
+    module->driver_ctx.mdelay = platform_delay;
+    module->driver_ctx.handle = &module->spi_dev;
+
+    // 3. Check connection ("Who Am I")
+    uint8_t whoamI = 0;
+    if (lis3dh_device_id_get(&module->driver_ctx, &whoamI) != 0) {
+        LOG_E(TAG, "Failed to read WhoAmI register");
+        return HAL_ERR_FAILED;
+    }
+    if (whoamI != LIS3DH_ID) {
+        LOG_E(TAG, "Invalid WhoAmI: 0x%02X, expected 0x%02X", whoamI, LIS3DH_ID);
+        return HAL_ERR_FAILED;
+    }
+    LOG_I(TAG, "LIS3DH WhoAmI check passed.");
+    
+    // 4. Reboot device to known state
+    lis3dh_boot_set(&module->driver_ctx, PROPERTY_ENABLE);
+    platform_delay(10); // Wait for boot
+
+    // 5. Apply configuration
+    lis3dh_operating_mode_set(&module->driver_ctx, module->config.op_mode);
+    lis3dh_full_scale_set(&module->driver_ctx, module->config.full_scale);
+    lis3dh_data_rate_set(&module->driver_ctx, module->config.output_data_rate);
+    lis3dh_block_data_update_set(&module->driver_ctx, PROPERTY_ENABLE);
+    
+    // TODO: Implement self-test logic from lis3dh_self_test.c example
+    
+    LOG_I(TAG, "LIS3DH initialized successfully.");
+    module->initialized = true;
+    return HAL_ERR_NONE;
+}
+
+void accel_module_create_task(accel_module_t *module) {
+    xTaskCreatePinnedToCore(
+        accel_module_task,
+        "ACCEL_TASK",
+        4096,
+        module,
+        TASK_PRIORITY_DEFAULT, // Choose an appropriate priority
+        &module->task_handle,
+        0 // Core 0
+    );
+}
+
+STEP 2: MODIFY EXISTING SYSTEM FILES
+2.1. Modify app_state.h
+
+Add new fields for accelerometer data.
+
+C
+
+// in app_state_field_mask_e enum:
+// ... (previous fields)
+APP_STATE_FIELD_PLANE_ACCEL_X = (1ULL << 61),
+APP_STATE_FIELD_PLANE_ACCEL_Y = (1ULL << 62),
+APP_STATE_FIELD_PLANE_ACCEL_Z = (1ULL << 63),
+
+// in app_state_s struct:
+// ... (previous fields)
+int16_t plane_accel_x; // Raw accelerometer data X
+int16_t plane_accel_y; // Raw accelerometer data Y
+int16_t plane_accel_z; // Raw accelerometer data Z
+
+2.2. Modify app_logic.h
+
+Add a task handle for the new module to the main app_logic_t struct.
+
+C
+
+// in app_logic_s struct:
+// ...
+TaskHandle_t led_task_handle;
+TaskHandle_t accel_task_handle; // <-- Add this
+// ...
+2.3. Modify main.c
+
+Initialize the new module in app_main.
+
+C
+
+// At the top of main.c with other static definitions
+#include "modules/accel_module.h"
+static accel_module_t g_accel_module;
+
+// In app_main() function, after other initializations
+// ...
+io_manager_init(&io_manager);
+led_module_init(&led_module);
+
+// Initialize Accelerometer
+accel_config_t accel_cfg = {
+    .output_data_rate = LIS3DH_ODR_100Hz,
+    .full_scale = LIS3DH_2g,
+    .op_mode = LIS3DH_HR_12bit,
+    .spi_bus = SPI2_HOST, // IMPORTANT: Use the correct SPI bus for your hardware
+    .cs_pin = 27 // IMPORTANT: Use the correct CS GPIO pin for your hardware
+};
+if (accel_module_init(&g_accel_module, &accel_cfg) != HAL_ERR_NONE) {
+    LOG_E(TAG, "Failed to initialize accelerometer module. Entering error state.");
+    // Handle error state, maybe blink an LED pattern
+}
+
+app_logic_init(&app_logic, &io_manager, &led_module);
+app_logic_start_all_tasks(&app_logic);
+// ...
+2.4. Modify app_logic.c
+
+Start the accelerometer task in app_logic_start_all_tasks.
+
+C
+
+// Add include at the top
+#include "modules/accel_module.h"
+
+// Get the global instance (or pass it in)
+extern accel_module_t g_accel_module; // Assuming it's defined in main.c
+
+esp_err_t app_logic_start_all_tasks(app_logic_t *app) {
+    // ... (existing task creations)
+    
+    // Start LED task
+    // ...
+    
+    // Start Accel task
+    accel_module_create_task(&g_accel_module);
+    app->accel_task_handle = g_accel_module.task_handle;
+    if (app->accel_task_handle == NULL) {
+        LOG_E(TAG, "Failed to create accel_module_task");
+        result = ESP_FAIL;
+    } else {
+        LOG_I(TAG, "accel_module_task created successfully");
+    }
+
+    // Start test mode cycle task
+    // ...
+    return result;
+}
+2.5. Modify CMakeLists.txt
+
+Add the new module to the build.
+
+CMake
+
+# In your main CMakeLists.txt or component CMakeLists.txt
+
+# ... (existing file list)
+set(SOURCES
+    ...
+    "modules/io_manager.c"
+    "modules/led_module.c"
+    "modules/accel_module.c"  # <-- ADD THIS
+    ...
+    "drivers/st/lis3dh/lis3dh_reg.c" # <-- ADD THIS
+)
+
+# Ensure the drivers directory is in the include path
+target_include_directories(${COMPONENT_TARGET} PUBLIC
+    ...
+    "drivers/st/lis3dh" # <-- ADD THIS if not covered by a general "drivers" path
+)
+FINAL CHECKS
+Verify the SPI bus number (SPI2_HOST, SPI3_HOST, etc.) is correct for your hardware target.
+
+Verify the Chip Select (CS) GPIO pin number is correct.
+
+Verify the task priorities are set appropriately to avoid starvation or priority inversion.
+
+The platform_spi_* functions are simplified. The LIS3DH protocol for multi-byte reads/writes should be double-checked against the datasheet to ensure the flags (0x80 for read, 0x40 for multi-byte) are handled correctly by the combination of the driver, the platform function, and the underlying HAL.
