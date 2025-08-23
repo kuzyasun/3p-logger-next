@@ -59,3 +59,16 @@ void app_state_set_i8(app_state_field_mask_e field_mask, int8_t *field_ptr, int8
 void app_state_set_float(app_state_field_mask_e field_mask, float *field_ptr, float value) { SET_FIELD(float, field_mask, field_ptr, value); }
 
 void app_state_set_bool(app_state_field_mask_e field_mask, bool *field_ptr, bool value) { SET_FIELD(bool, field_mask, field_ptr, value); }
+
+void app_state_update_rc_channels(const uint16_t new_channels[], uint8_t channel_count) {
+    app_state_t *app_state = app_state_get_instance();
+    uint8_t channels_to_copy = channel_count > 18 ? 18 : channel_count;
+
+    app_state_begin_update();
+    memcpy(app_state->plane_rc_channels, new_channels, channels_to_copy * sizeof(uint16_t));
+    if (channels_to_copy < 18) {
+        memset(app_state->plane_rc_channels + channels_to_copy, 0, (18 - channels_to_copy) * sizeof(uint16_t));
+    }
+    app_state_set_u32(APP_STATE_FIELD_PLANE_RC_CHANNELS, (uint32_t *)&app_state->plane_rc_channels, 1);
+    app_state_end_update();
+}

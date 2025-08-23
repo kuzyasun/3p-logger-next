@@ -129,7 +129,7 @@ typedef struct app_state_s {
     uint8_t plane_vtx_band;          // VTX band
     uint8_t plane_vtx_channel;       // VTX channel
     uint8_t plane_vtx_power;         // VTX power level
-    uint16_t plane_rc_channels[16];  // RC channel values (11-bit each)
+    uint16_t plane_rc_channels[18];  // RC channel values (11-bit each)
 
     // Missing fields that are used by protocols
     uint8_t plane_armed;      // Armed status (0/1)
@@ -201,6 +201,8 @@ void app_state_set_u32(app_state_field_mask_e field_mask, uint32_t *field_ptr, u
 void app_state_set_i8(app_state_field_mask_e field_mask, int8_t *field_ptr, int8_t value);
 void app_state_set_float(app_state_field_mask_e field_mask, float *field_ptr, float value);
 void app_state_set_bool(app_state_field_mask_e field_mask, bool *field_ptr, bool value);
+
+void app_state_update_rc_channels(const uint16_t new_channels[], uint8_t channel_count);
 
 #ifdef __cplusplus
 }

@@ -181,16 +181,26 @@ static bool mavlink_process_frame(mavlink_state_t *state, const uint8_t *frame_d
             break;
         }
 
+        case MAVLINK_MSG_ID_RC_CHANNELS: {  // ID: 65
+            mavlink_rc_channels_t rc;
+            mavlink_msg_rc_channels_decode(&msg, &rc);
+
+            uint16_t all_channels[18] = {rc.chan1_raw,  rc.chan2_raw,  rc.chan3_raw,  rc.chan4_raw,  rc.chan5_raw,  rc.chan6_raw,
+                                         rc.chan7_raw,  rc.chan8_raw,  rc.chan9_raw,  rc.chan10_raw, rc.chan11_raw, rc.chan12_raw,
+                                         rc.chan13_raw, rc.chan14_raw, rc.chan15_raw, rc.chan16_raw, rc.chan17_raw, rc.chan18_raw};
+            uint8_t valid_channels = rc.chancount;
+            app_state_update_rc_channels(all_channels, valid_channels);
+            LOG_D(TAG, "MAVLink RC: Processed %d channels.", valid_channels);
+            break;
+        }
+
         case MAVLINK_MSG_ID_RC_CHANNELS_RAW: {  // ID: 35
             mavlink_rc_channels_raw_t rc;
             mavlink_msg_rc_channels_raw_decode(&msg, &rc);
 
-            uint16_t rc_channels[8] = {rc.chan1_raw, rc.chan2_raw, rc.chan3_raw, rc.chan4_raw, rc.chan5_raw, rc.chan6_raw, rc.chan7_raw, rc.chan8_raw};
-
-            // Залежно від вашої реалізації app_state, тут ви можете зберегти ці значення
-            // memcpy(app_state->plane_rc_channels, rc_channels, sizeof(rc_channels));
-
-            LOG_D(TAG, "RC Raw: CH1=%u, CH2=%u, CH3=%u, CH4=%u", rc.chan1_raw, rc.chan2_raw, rc.chan3_raw, rc.chan4_raw);
+            uint16_t first_8_channels[8] = {rc.chan1_raw, rc.chan2_raw, rc.chan3_raw, rc.chan4_raw, rc.chan5_raw, rc.chan6_raw, rc.chan7_raw, rc.chan8_raw};
+            app_state_update_rc_channels(first_8_channels, 8);
+            LOG_D(TAG, "MAVLink RC Raw: Processed 8 channels.");
             break;
         }
 

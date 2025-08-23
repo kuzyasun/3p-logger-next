@@ -229,17 +229,8 @@ static void msp_process_packet(msp_state_t *state, uint8_t cmd, const uint8_t *p
         case MSP_RC: {
             if (len > 0 && (len % 2 == 0)) {
                 const uint8_t num_channels = len / 2;
-                uint16_t rc_channels[16];
-
-                app_state_begin_update();
-                for (int i = 0; i < num_channels && i < 16; i++) {
-                    memcpy(&rc_channels[i], payload + (i * 2), sizeof(uint16_t));
-                }
-                memcpy(app_state->plane_rc_channels, rc_channels, sizeof(rc_channels));
-                app_state_set_u32(APP_STATE_FIELD_PLANE_RC_CHANNELS, (uint32_t *)&app_state->plane_rc_channels, 1);
-                app_state_end_update();
-
-                LOG_D(TAG, "RC: CH1=%u, CH2=%u, CH3=%u, CH4=%u...", rc_channels[0], rc_channels[1], rc_channels[2], rc_channels[3]);
+                app_state_update_rc_channels((const uint16_t *)payload, num_channels);
+                LOG_D(TAG, "RC: Processed %d channels.", num_channels);
             }
             break;
         }
