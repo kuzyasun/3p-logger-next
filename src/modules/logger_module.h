@@ -1,5 +1,6 @@
 #pragma once
 
+#include "app_state.h"
 #include "config_manager.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"

@@ -2,6 +2,9 @@
 
 #define ESP32
 
+#define ACCEL_SPI_HOST SPI2_HOST
+#define SDCARD_SPI_HOST SPI3_HOST
+
 #define BUTTON_ENTER_GPIO 0
 
 #define COMP_1_OUT_GPIO 1

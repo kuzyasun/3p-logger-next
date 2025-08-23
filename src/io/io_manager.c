@@ -9,9 +9,6 @@
 #include "app_logic.h"
 #include "app_state.h"
 
-#define ACCEL_SPI_HOST SPI2_HOST
-#define SDCARD_SPI_HOST SPI3_HOST
-
 static const char *TAG = "IOM";
 
 /**
