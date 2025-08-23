@@ -16,6 +16,7 @@ typedef struct {
     TaskHandle_t app_logic_handle;
     TaskHandle_t io_manager_handle;
     TaskHandle_t led_task_handle;
+    TaskHandle_t accel_task_handle;
 } task_management_t;
 
 typedef struct app_logic_s {
@@ -25,6 +26,7 @@ typedef struct app_logic_s {
     TaskHandle_t app_logic_handle;
     TaskHandle_t io_manager_handle;
     TaskHandle_t led_task_handle;
+    TaskHandle_t accel_task_handle;
 
     nmea_parser_t nmea_parser;
     crsf_parser_t crsf_parser;

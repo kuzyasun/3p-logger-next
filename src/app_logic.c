@@ -16,11 +16,13 @@
 #include "freertos/task.h"
 #include "io/io_manager.h"
 #include "io/serial.h"
+#include "modules/accel_module.h"
 #include "platform/system.h"
 
 static const char *TAG = "APPL";
 
 static QueueHandle_t g_command_queue;
+extern accel_module_t g_accel_module;
 
 void app_logic_init(app_logic_t *app, io_manager_t *io_manager, led_module_t *led_module) {
     app->io_manager = io_manager;
@@ -180,6 +182,16 @@ esp_err_t app_logic_start_all_tasks(app_logic_t *app) {
         result = ESP_FAIL;
     } else {
         LOG_I(TAG, "LED task created successfully");
+    }
+
+    // Start Accel task
+    accel_module_create_task(&g_accel_module);
+    app->accel_task_handle = g_accel_module.task_handle;
+    if (app->accel_task_handle == NULL) {
+        LOG_E(TAG, "Failed to create accel_module_task");
+        result = ESP_FAIL;
+    } else {
+        LOG_I(TAG, "accel_module_task created successfully");
     }
 
     // Start test mode cycle task

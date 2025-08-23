@@ -87,6 +87,9 @@ typedef enum {
     APP_STATE_FIELD_PLANE_GPS_DATE_MONTH = (1ULL << 58),
     APP_STATE_FIELD_PLANE_GPS_DATE_YEAR = (1ULL << 59),
     APP_STATE_FIELD_CURRENT_MODE = (1ULL << 60),
+    APP_STATE_FIELD_ACCEL_X = (1ULL << 61),
+    APP_STATE_FIELD_ACCEL_Y = (1ULL << 62),
+    APP_STATE_FIELD_ACCEL_Z = (1ULL << 63),
 
 } app_state_field_mask_e;
 
@@ -171,6 +174,10 @@ typedef struct app_state_s {
     uint8_t plane_gps_date_day;      // GPS date day
     uint8_t plane_gps_date_month;    // GPS date month
     uint8_t plane_gps_date_year;     // GPS date year (2-digit)
+
+    int16_t accel_x;  // Raw accelerometer data X
+    int16_t accel_y;  // Raw accelerometer data Y
+    int16_t accel_z;  // Raw accelerometer data Z
 
     Notifier *changed_notifier;
     uint64_t changed_mask;
