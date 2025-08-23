@@ -11,9 +11,7 @@
 
 #define SERIAL_IO(port) IO_MAKE(serial_port_read, serial_port_write, serial_port_io_flags, port)
 
-#ifdef SERIAL_UNUSED_GPIO
 #define SERIAL_UNUSED_GPIO -1
-#endif
 
 typedef struct serial_port_s serial_port_t;
 

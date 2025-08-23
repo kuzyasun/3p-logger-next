@@ -6,8 +6,8 @@
 #include <string.h>
 #include <target.h>
 
-#include "app_state.h"
 #include "app_logic.h"
+#include "app_state.h"
 
 static const char *TAG = "IOM";
 
@@ -34,12 +34,7 @@ void io_manager_init(io_manager_t *iom) {
     LOG_I(TAG, "IO Manager Initialized");
 }
 
-void io_manager_configure_uart(io_manager_t *iom,
-                               io_uart_t *uart,
-                               struct app_logic_s *app_logic,
-                               protocol_e protocol,
-                               int baudrate,
-                               hal_gpio_t rx_pin,
+void io_manager_configure_uart(io_manager_t *iom, io_uart_t *uart, struct app_logic_s *app_logic, protocol_e protocol, int baudrate, hal_gpio_t rx_pin,
                                hal_gpio_t tx_pin) {
     (void)iom;
 
@@ -76,15 +71,22 @@ void io_manager_configure_uart(io_manager_t *iom,
 
     uart->protocol = protocol;
     uart->baudrate = baudrate;
+
+    if (rx_pin == HAL_GPIO_NONE) rx_pin = SERIAL_UNUSED_GPIO;
+    if (tx_pin == HAL_GPIO_NONE) tx_pin = SERIAL_UNUSED_GPIO;
+
     uart->gpio_rx = rx_pin;
     uart->gpio_tx = tx_pin;
+
+    const bool rx_only = (uart->gpio_tx == SERIAL_UNUSED_GPIO) && (uart->gpio_rx != SERIAL_UNUSED_GPIO);
+    const bool tx_only = (uart->gpio_rx == SERIAL_UNUSED_GPIO) && (uart->gpio_tx != SERIAL_UNUSED_GPIO);
 
     serial_port_config_t serial_config = {
         .baud_rate = uart->baudrate,
         .rx_pin = uart->gpio_rx,
         .tx_pin = uart->gpio_tx,
-        .rx_buffer_size = 1024,
-        .tx_buffer_size = 256,
+        .rx_buffer_size = tx_only ? 0 : 1024,  // TX-only -> no RX buffer
+        .tx_buffer_size = rx_only ? 0 : 256,   // RX-only -> no TX buffer
         .inverted = false,
         .parity = SERIAL_PARITY_DISABLE,
         .stop_bits = SERIAL_STOP_BITS_1,
@@ -96,12 +98,7 @@ void io_manager_configure_uart(io_manager_t *iom,
 
     if (uart->serial_port) {
         uart->io_runing = true;
-        LOG_I(TAG,
-              "Successfully configured UART with protocol %d on RX:%d/TX:%d at %d baud.",
-              protocol,
-              rx_pin,
-              tx_pin,
-              baudrate);
+        LOG_I(TAG, "Successfully configured UART with protocol %d on RX:%d/TX:%d at %d baud.", protocol, rx_pin, tx_pin, baudrate);
     } else {
         uart->io_runing = false;
         LOG_E(TAG, "Failed to open serial port for protocol %d.", protocol);

@@ -1,7 +1,6 @@
 #pragma once
 
 #define ESP32
-#define SERIAL_UNUSED_GPIO 22
 
 #define BUTTON_ENTER_GPIO 0
 
