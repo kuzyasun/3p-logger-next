@@ -17,6 +17,9 @@
 - reset
 - next Uploads and monitor should automatically upload and listen serial monitor
 
+## Configuation
+
+There is doc/configuration.ini  example  write it to SD card
 
  to run menu config 
  ```
