@@ -1,0 +1,229 @@
+================================================
+STEP-BY-STEP PLAN: IMPLEMENTING `logger_module` (Rev 2)
+================================================
+
+This plan details the creation of a logger module with a double-buffer mechanism to write high-frequency data to an SD card via a dedicated SPI bus without data loss.
+
+---
+### Buffer Size Calculation
+---
+* **Data Record Size:**
+    * Raw Accel Data: 6 bytes
+    * plane_speed (`int16_t`): 2 bytes
+    * plane_fused_altitude (`int32_t`): 4 bytes
+    * Future Data: 2 bytes
+    * **Total per record: 14 bytes**
+* **Data Rate:** 1000 records/sec (assuming 1 kHz from `accel_module`)
+* **Bytes per Second:** 14 bytes/record * 1000 records/sec = 14,000 bytes/sec
+* **Target Write Frequency:** ~2 Hz (one buffer write every ~500 ms)
+* **Calculated Buffer Size:** 14,000 bytes/sec * 0.5 sec = 7,000 bytes
+* **Chosen Buffer Size:** We will use **8192 bytes (8 KB)** for efficiency. This results in a write frequency of `14000 / 8192 ≈ 1.7 Hz`, which meets the goal of approximately two writes per second.
+
+---
+### Hardware Configuration (from target.h)
+---
+* **Accelerometer (SPI Bus 1 - e.g., SPI2_HOST):**
+    * CLK: `ACC_SPI_CLK_GPIO` (7)
+    * MISO: `ACC_SPI_MISO_GPIO` (9)
+    * MOSI: `ACC_SPI_MOSI_GPIO` (11)
+    * CS: `ACC_SPI_CS_GPIO` (12)
+* **SD Card (SPI Bus 2 - e.g., SPI3_HOST):**
+    * CLK: `SD_SPI_CLK_GPIO` (36)
+    * MISO: `SD_SPI_MISO_GPIO` (3)
+    * MOSI: `SD_SPI_MOSI_GPIO` (5)
+    * CS: `SD_SPI_CS_GPIO` (34)
+
+---
+### STEP 1: CREATE SD CARD ABSTRACTION LAYER (HAL)
+---
+
+**1.1. Create Header File: `hal/sdcard.h`**
+
+```c
+// hal/sdcard.h
+#pragma once
+
+#include "hal/err.h"
+#include "hal/spi.h"
+#include <stddef.h>
+
+// Opaque file handle
+typedef void* sdcard_file_handle_t;
+
+// Public API
+hal_err_t sdcard_init(hal_spi_bus_t bus);
+hal_err_t sdcard_open_file(const char *path, const char *mode, sdcard_file_handle_t *handle);
+int sdcard_write(sdcard_file_handle_t handle, const void *data, size_t size);
+hal_err_t sdcard_fsync(sdcard_file_handle_t handle);
+hal_err_t sdcard_close_file(sdcard_file_handle_t handle);
+hal_err_t sdcard_deinit(void);
+1.2. Create Source File: hal/sdcard.c
+
+This file will implement the API from hal/sdcard.h.
+
+It will use the ESP-IDF SD/MMC driver (driver/sdspi_host.h, sdmmc_host.h) and the FatFs library (ff.h).
+
+sdcard_init() will take the pre-initialized SPI bus handle, mount the filesystem using the SD_SPI_CS_GPIO pin, and prepare the card for use.
+
+The other functions will wrap standard FatFs calls like f_open, f_write, f_sync, and f_close.
+
+STEP 2: CREATE THE logger_module
+2.1. Create Header File: modules/logger_module.h
+
+C
+
+// modules/logger_module.h
+#pragma once
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
+#include "util/observer.h"
+#include "hal/sdcard.h"
+#include "hal/spi.h"
+
+#define LOGGER_BUFFER_SIZE 8192
+
+typedef struct {
+    // Double buffers
+    uint8_t ping_buffer[LOGGER_BUFFER_SIZE];
+    uint8_t pong_buffer[LOGGER_BUFFER_SIZE];
+    
+    // State
+    uint8_t *active_buffer;
+    volatile size_t active_buffer_idx;
+    QueueHandle_t buffer_queue;
+    TaskHandle_t task_handle;
+    Observer observer;
+    sdcard_file_handle_t log_file;
+    bool sd_card_ok;
+} logger_module_t;
+
+// Public API
+void logger_module_init(logger_module_t *module, hal_spi_bus_t sd_spi_bus);
+void logger_module_create_task(logger_module_t *module);
+2.2. Create Source File: modules/logger_module.c
+
+This file's implementation will be largely the same as the previous plan, with the key difference being how it is initialized.
+
+C
+
+// modules/logger_module.c
+// ... (includes and TAG definition) ...
+
+// --- Producer: app_state observer callback ---
+static void on_app_state_change(Notifier *notifier, Observer *observer, void *data) {
+    // ... (Implementation remains the same as previous plan)
+    // It will check the app_state change mask, format the 14-byte record,
+    // and add it to the active buffer. When full, it will send the
+    // buffer pointer to the queue and swap active buffers.
+}
+
+// --- Consumer: Logger FreeRTOS Task ---
+static void logger_task(void *arg) {
+    // ... (Implementation remains the same as previous plan)
+    // It will block on the queue, and upon receiving a buffer,
+    // it will call sdcard_write() followed by sdcard_fsync().
+}
+
+// --- Public API Implementation ---
+void logger_module_init(logger_module_t *module, hal_spi_bus_t sd_spi_bus) {
+    memset(module, 0, sizeof(logger_module_t));
+
+    // The SPI bus for the SD card is initialized externally and passed in.
+    if (sdcard_init(sd_spi_bus) != HAL_ERR_NONE) {
+        LOG_E(TAG, "Failed to initialize SD card HAL. Logger disabled.");
+        module->sd_card_ok = false;
+        return;
+    }
+
+    if (sdcard_open_file("/log.bin", "w", &module->log_file) != HAL_ERR_NONE) {
+        LOG_E(TAG, "Failed to create log file. Logger disabled.");
+        module->sd_card_ok = false;
+        return;
+    }
+
+    module->sd_card_ok = true;
+    module->buffer_queue = xQueueCreate(2, sizeof(uint8_t*));
+    module->active_buffer = module->ping_buffer;
+    module->active_buffer_idx = 0;
+
+    // Register as an observer of app_state
+    ObserverCreate(&module->observer, on_app_state_change, module);
+    NotifierAddObserver(app_state_get_notifier(), &module->observer);
+
+    LOG_I(TAG, "Logger module initialized.");
+}
+
+void logger_module_create_task(logger_module_t *module) {
+    // ... (Implementation remains the same as previous plan)
+}
+STEP 3: MODIFY EXISTING SYSTEM FILES
+3.1. Modify main.c
+
+This is where the new hardware configuration is applied.
+
+C
+
+// At the top of main.c with other static definitions
+#include "modules/accel_module.h"
+#include "modules/logger_module.h"
+#include "hal/spi.h"
+#include "target.h" // Include the new hardware definitions
+
+static accel_module_t g_accel_module;
+static logger_module_t g_logger_module;
+
+// Define which hardware SPI peripherals to use
+#define ACCEL_SPI_HOST SPI2_HOST
+#define SDCARD_SPI_HOST SPI3_HOST // Use a different bus for the SD card
+
+// In app_main() function
+void app_main() {
+    // ... (early initializations)
+
+    // --- Initialize hardware peripherals (SPI buses) ---
+    LOG_I(TAG, "Initializing SPI buses...");
+    // Initialize SPI bus for Accelerometer
+    hal_spi_bus_init(ACCEL_SPI_HOST, ACC_SPI_MISO_GPIO, ACC_SPI_MOSI_GPIO, ACC_SPI_CLK_GPIO);
+    
+    // Initialize SPI bus for SD Card
+    hal_spi_bus_init(SDCARD_SPI_HOST, SD_SPI_MISO_GPIO, SD_SPI_MOSI_GPIO, SD_SPI_CLK_GPIO);
+
+    // ... (app_state_init, etc.)
+
+    // --- Initialize Modules ---
+    
+    // Initialize Accelerometer using its specific bus and CS pin
+    accel_config_t accel_cfg = {
+        .output_data_rate = LIS3DH_ODR_1kHz620_LP, // Set to 1kHz+ for high frequency logging
+        .full_scale = LIS3DH_2g,
+        .op_mode = LIS3DH_HR_12bit,
+        .spi_bus = ACCEL_SPI_HOST,
+        .cs_pin = ACC_SPI_CS_GPIO // From target.h
+    };
+    accel_module_init(&g_accel_module, &accel_cfg);
+    
+    // Initialize Logger using the dedicated SD card SPI bus
+    logger_module_init(&g_logger_module, SDCARD_SPI_HOST);
+
+    // ... (app_logic_init and app_logic_start_all_tasks)
+}
+3.2. Modify app_logic.c, app_logic.h, and CMakeLists.txt
+
+The changes to these files remain the same as the previous plan.
+
+Add logger_task_handle to the app_logic_t struct in app_logic.h.
+
+In app_logic.c, access the global g_logger_module instance and call logger_module_create_task inside app_logic_start_all_tasks.
+
+In CMakeLists.txt, add modules/logger_module.c and hal/sdcard.c to the list of source files.
+
+SUMMARY OF CHANGES FROM PREVIOUS PLAN
+The plan now explicitly defines which GPIO pins and SPI host peripherals are used for each device, based on target.h.
+
+The initialization logic in main.c is updated to configure two separate SPI buses before initializing the modules that use them.
+
+The logger_module_init function is updated to accept the pre-initialized SD card SPI bus handle, ensuring clear separation of concerns.
+
+The accelerometer configuration in main.c is updated to reflect the high-frequency (1kHz+) data rate required for logging.
