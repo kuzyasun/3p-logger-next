@@ -12,8 +12,10 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "hal/gpio.h"
+#include "hal/spi.h"
 #include "io/io_manager.h"
 #include "modules/accel_module.h"
+#include "modules/logger_module.h"
 #include "platform/system.h"
 #include "soc/rtc_cntl_reg.h"
 #include "soc/soc.h"
@@ -76,6 +78,10 @@ static io_manager_t io_manager;
 static app_logic_t app_logic;
 static led_module_t led_module;
 accel_module_t g_accel_module;
+logger_module_t g_logger_module;
+
+#define ACCEL_SPI_HOST SPI2_HOST
+#define SDCARD_SPI_HOST SPI3_HOST
 
 void app_main() {
     usb_boot_cmd_start();
@@ -104,20 +110,27 @@ void app_main() {
     io_manager_init(&io_manager);
     led_module_init(&led_module);
 
-    // Initialize SPI bus for accelerometer
-    hal_spi_bus_init(SPI2_HOST, ACC_SPI_MISO_GPIO, ACC_SPI_MOSI_GPIO, ACC_SPI_CLK_GPIO);
+    LOG_I(TAG, "Initializing SPI buses...");
+    // Initialize SPI bus for Accelerometer
+    hal_spi_bus_init(ACCEL_SPI_HOST, ACC_SPI_MISO_GPIO, ACC_SPI_MOSI_GPIO, ACC_SPI_CLK_GPIO);
+
+    // Initialize SPI bus for SD Card
+    hal_spi_bus_init(SDCARD_SPI_HOST, SD_SPI_MISO_GPIO, SD_SPI_MOSI_GPIO, SD_SPI_CLK_GPIO);
 
     // Initialize Accelerometer
     accel_config_t accel_cfg = {
-        .output_data_rate = LIS3DH_ODR_100Hz,
+        .output_data_rate = LIS3DH_ODR_1kHz620_LP,
         .full_scale = LIS3DH_2g,
         .op_mode = LIS3DH_HR_12bit,
-        .spi_bus = SPI2_HOST,
+        .spi_bus = ACCEL_SPI_HOST,
         .cs_pin = ACC_SPI_CS_GPIO,
     };
     if (accel_module_init(&g_accel_module, &accel_cfg) != HAL_ERR_NONE) {
         LOG_E(TAG, "Failed to initialize accelerometer module. Entering error state.");
     }
+
+    // Initialize Logger
+    logger_module_init(&g_logger_module, SDCARD_SPI_HOST);
 
     app_logic_init(&app_logic, &io_manager, &led_module);
     app_logic_start_all_tasks(&app_logic);
