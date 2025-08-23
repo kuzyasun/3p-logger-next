@@ -9,6 +9,9 @@
 #include "app_logic.h"
 #include "app_state.h"
 
+#define ACCEL_SPI_HOST SPI2_HOST
+#define SDCARD_SPI_HOST SPI3_HOST
+
 static const char *TAG = "IOM";
 
 /**
@@ -26,12 +29,30 @@ static void uart_byte_received_callback(const serial_port_t *port, uint8_t b, vo
 // Public API
 // ---------------------------------------------------------------------------
 
-void io_manager_init(io_manager_t *iom) {
+hal_err_t io_manager_init(io_manager_t *iom) {
     memset(iom, 0, sizeof(*iom));
 
-    // Initialize UARTs, SPI buses, etc.
+    LOG_I(TAG, "Initializing SPI buses...");
 
-    LOG_I(TAG, "IO Manager Initialized");
+    // Initialize SPI bus for Accelerometer
+    hal_err_t err =
+        hal_spi_bus_init(ACCEL_SPI_HOST, ACC_SPI_MISO_GPIO, ACC_SPI_MOSI_GPIO, ACC_SPI_CLK_GPIO);
+    if (err != HAL_ERR_NONE) {
+        LOG_E(TAG, "Failed to initialize accelerometer SPI bus");
+        return err;
+    }
+    iom->accel_spi_bus = ACCEL_SPI_HOST;
+
+    // Initialize SPI bus for SD Card
+    err = hal_spi_bus_init(SDCARD_SPI_HOST, SD_SPI_MISO_GPIO, SD_SPI_MOSI_GPIO, SD_SPI_CLK_GPIO);
+    if (err != HAL_ERR_NONE) {
+        LOG_E(TAG, "Failed to initialize SD card SPI bus");
+        return err;
+    }
+    iom->sdcard_spi_bus = SDCARD_SPI_HOST;
+
+    LOG_I(TAG, "IO Manager Initialized Successfully");
+    return HAL_ERR_NONE;
 }
 
 void io_manager_configure_uart(io_manager_t *iom, io_uart_t *uart, struct app_logic_s *app_logic, protocol_e protocol, int baudrate, hal_gpio_t rx_pin,

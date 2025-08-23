@@ -18,7 +18,7 @@ typedef struct {
 } accel_config_t;
 
 // Main module state structure
-typedef struct {
+typedef struct accel_module_s {
     stmdev_ctx_t driver_ctx;
     hal_spi_device_handle_t spi_dev;
     TaskHandle_t task_handle;
@@ -29,3 +29,4 @@ typedef struct {
 // Public API
 hal_err_t accel_module_init(accel_module_t *module, const accel_config_t *config);
 void accel_module_create_task(accel_module_t *module);
+
