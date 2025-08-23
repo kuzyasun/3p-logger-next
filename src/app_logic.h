@@ -8,6 +8,7 @@
 #include "modules/accel_module.h"
 #include "modules/led_module.h"
 #include "modules/logger_module.h"
+#include "modules/pz_module.h"
 #include "protocols/crsf.h"
 #include "protocols/mavlink.h"
 #include "protocols/msp.h"
@@ -29,6 +30,7 @@ typedef struct app_logic_s {
     led_module_t *led_module;
     accel_module_t *accel_module;
     logger_module_t *logger_module;
+    pz_module_t *pz_module;
 
     // Tasks handles
     TaskHandle_t app_logic_handle;
@@ -36,6 +38,7 @@ typedef struct app_logic_s {
     TaskHandle_t led_task_handle;
     TaskHandle_t accel_task_handle;
     TaskHandle_t logger_task_handle;
+    TaskHandle_t pz_task_handle;
 
     // Protocol parsers
     nmea_parser_t nmea_parser;

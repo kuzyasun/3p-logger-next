@@ -19,6 +19,7 @@
 #include "modules/accel_module.h"
 #include "modules/led_module.h"
 #include "modules/logger_module.h"
+#include "modules/pz_module.h"
 #include "platform/system.h"
 #include "protocols/crsf.h"
 #include "protocols/mavlink.h"
@@ -78,6 +79,15 @@ void app_logic_init(app_logic_t *app) {
         }
     }
 
+    // Initialize Piezo Module
+    app->pz_module = calloc(1, sizeof(pz_module_t));
+    if (app->pz_module == NULL) {
+        LOG_E(TAG, "Failed to allocate memory for Piezo Module. Halting.");
+        while (1) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+    }
+
     g_command_queue = xQueueCreate(20, sizeof(app_command_t));
 
     // Initialize all protocol parsers
@@ -125,6 +135,18 @@ app_err_t app_logic_init_modules(app_logic_t *app) {
         app_state_end_update();
         return APP_ERR_LOGGER_INIT_FAILED;
     }
+
+    // Initialize Piezo
+    if (pz_module_init(app->pz_module) != APP_OK) {
+        LOG_E(TAG, "Failed to initialize piezo module. Entering error state.");
+        app_state_begin_update();
+        app_state_set_u8(APP_STATE_FIELD_CURRENT_MODE, (uint8_t *)&state->current_mode, APP_MODE_ERROR);
+        state->system_error_code = APP_ERR_GENERIC;
+        app_state_end_update();
+        return APP_ERR_GENERIC;
+    }
+    // As a test, set a default threshold
+    pz_module_set_threshold(128, 128);
 
     LOG_I(TAG, "All application modules initialized successfully.");
     return APP_OK;
@@ -301,6 +323,19 @@ esp_err_t app_logic_start_all_tasks(app_logic_t *app) {
         }
     } else {
         LOG_W(TAG, "Skipping logger_task creation, module not initialized.");
+    }
+
+    if (app->pz_module->is_initialized) {
+        pz_module_create_task(app->pz_module);
+        app->pz_task_handle = app->pz_module->task_handle;
+        if (app->pz_task_handle == NULL) {
+            LOG_E(TAG, "Failed to create pz_module_task");
+            result = ESP_FAIL;
+        } else {
+            LOG_I(TAG, "pz_module_task created successfully");
+        }
+    } else {
+        LOG_W(TAG, "Skipping pz_module_task creation, module not initialized.");
     }
 
     // Start test mode cycle task
