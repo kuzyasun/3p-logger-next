@@ -11,6 +11,7 @@
 
 #include "app_commands.h"
 #include "app_state.h"
+#include "config_manager.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
@@ -34,6 +35,8 @@ static QueueHandle_t g_command_queue;
 
 void app_logic_init(app_logic_t *app) {
     LOG_I(TAG, "Initializing Application Logic...");
+
+    config_manager_load();
 
     // Initialize IO Manager
     app->io_manager = calloc(1, sizeof(io_manager_t));
@@ -100,7 +103,8 @@ void app_logic_init(app_logic_t *app) {
 
     // Configure UART1 for CRSF input
     LOG_I(TAG, "Configuring IO peripherals...");
-    io_manager_configure_uart(app->io_manager, &app->io_manager->uart1, app, PROTOCOL_CRSF, 420000, UART1_RX_GPIO, SERIAL_UNUSED_GPIO);
+    io_manager_configure_uart(app->io_manager, &app->io_manager->uart1, app, g_app_config.uart1_protocol, g_app_config.uart1_baudrate, UART1_RX_GPIO,
+                              SERIAL_UNUSED_GPIO);
 
     LOG_I(TAG, "Application Logic Initialized.");
 }
@@ -111,11 +115,11 @@ app_err_t app_logic_init_modules(app_logic_t *app) {
 
     // Initialize Accelerometer
     accel_config_t accel_cfg = {
-        .output_data_rate = LIS3DH_ODR_1kHz620_LP,
-        .full_scale = LIS3DH_2g,
-        .op_mode = LIS3DH_HR_12bit,
-        .spi_bus = app->io_manager->accel_spi_bus,
-        .cs_pin = ACC_SPI_CS_GPIO,
+        .output_data_rate = g_app_config.accel_config.output_data_rate,
+        .full_scale = g_app_config.accel_config.full_scale,
+        .op_mode = g_app_config.accel_config.op_mode,
+        .spi_bus = g_app_config.accel_config.spi_bus,
+        .cs_pin = g_app_config.accel_config.cs_pin,
     };
     if (accel_module_init(app->accel_module, &accel_cfg) != HAL_ERR_NONE) {
         LOG_E(TAG, "Failed to initialize accelerometer module. Entering error state.");
@@ -145,8 +149,7 @@ app_err_t app_logic_init_modules(app_logic_t *app) {
         app_state_end_update();
         return APP_ERR_GENERIC;
     }
-    // As a test, set a default threshold
-    pz_module_set_threshold(128, 128);
+    pz_module_set_threshold(g_app_config.pz_dac1_threshold, g_app_config.pz_dac2_threshold);
 
     LOG_I(TAG, "All application modules initialized successfully.");
     return APP_OK;
