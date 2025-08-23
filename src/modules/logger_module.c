@@ -13,8 +13,8 @@ static void on_app_state_change(Notifier *notifier, Observer *observer, void *da
     logger_module_t *module = (logger_module_t *)observer->context;
     uint64_t *changed_mask = (uint64_t *)data;
 
-    uint64_t accel_mask = APP_STATE_FIELD_ACCEL_X | APP_STATE_FIELD_ACCEL_Y | APP_STATE_FIELD_ACCEL_Z;
-    if (!(*changed_mask & accel_mask)) {
+    uint64_t trigger_mask = APP_STATE_FIELD_ACCEL_X | APP_STATE_FIELD_ACCEL_Y | APP_STATE_FIELD_ACCEL_Z | APP_STATE_FIELD_PIEZO_MASK;
+    if (!(*changed_mask & trigger_mask)) {
         return;
     }
     if (!module->sd_card_ok) {
@@ -22,14 +22,20 @@ static void on_app_state_change(Notifier *notifier, Observer *observer, void *da
     }
 
     app_state_t *state = app_state_get_instance();
-    uint8_t record[14];
+    // New record size is 15 bytes
+    uint8_t record[15];
+    // 1. Accel data (6 bytes)
     memcpy(&record[0], &state->accel_x, 2);
     memcpy(&record[2], &state->accel_y, 2);
     memcpy(&record[4], &state->accel_z, 2);
-    memcpy(&record[6], &state->plane_speed, 2);
-    memcpy(&record[8], &state->plane_fused_altitude, 4);
+    // 2. Piezo mask (1 byte)
+    memcpy(&record[6], &state->piezo_mask, 1);
+    // 3. Telemetry data (6 bytes)
+    memcpy(&record[7], &state->plane_speed, 2);
+    memcpy(&record[9], &state->plane_fused_altitude, 4);
+    // 4. Future use (2 bytes)
     uint16_t future = 0;
-    memcpy(&record[12], &future, 2);
+    memcpy(&record[13], &future, 2);
 
     if (module->active_buffer_idx + sizeof(record) > LOGGER_BUFFER_SIZE) {
         uint8_t *full_buffer = module->active_buffer;
