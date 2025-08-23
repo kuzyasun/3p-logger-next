@@ -191,14 +191,44 @@ void serial_port_do_open(serial_port_t *port) {
         ESP_ERROR_CHECK(uart_set_line_inverse(port->port_num, UART_INVERSE_TXD | UART_INVERSE_RXD));
     }
 
-    if (tx_pin != rx_pin) {
+    // Check if we have a valid TX pin (not SERIAL_UNUSED_GPIO)
+    bool has_valid_tx = (tx_pin != SERIAL_UNUSED_GPIO);
+    bool has_valid_rx = (rx_pin != SERIAL_UNUSED_GPIO);
+
+    if (has_valid_tx && has_valid_rx && tx_pin != rx_pin) {
+        // Full duplex mode - both TX and RX pins are valid and different
         port->uses_driver = true;
         ESP_ERROR_CHECK(uart_driver_install(port->port_num, rx_buffer_size, port->config.tx_buffer_size, 10, &port->uart_queue, 0));
         ESP_ERROR_CHECK(uart_set_pin(port->port_num, tx_pin, rx_pin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 
         // Create event task for UART events
         xTaskCreate(serial_uart_event_task, "uart_event_task", 2048, port, TASK_PRIORITY_UART_EVENT, &port->uart_task_handle);
+    } else if (has_valid_rx && !has_valid_tx) {
+        // Receive-only mode - only RX pin is valid
+        // For ESP32, we need to use a valid GPIO for TX pin, but we can disable TX functionality
+        port->uses_driver = true;
+        ESP_ERROR_CHECK(uart_driver_install(port->port_num, rx_buffer_size, port->config.tx_buffer_size, 10, &port->uart_queue, 0));
+
+        // Use a valid GPIO pin for TX (we'll use GPIO 21 as a dummy TX pin)
+        // This is required because ESP32 uart_set_pin() doesn't accept -1 for TX
+        int dummy_tx_pin = SERIAL_UNUSED_GPIO;
+        ESP_ERROR_CHECK(uart_set_pin(port->port_num, dummy_tx_pin, rx_pin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+
+        // Disable TX interrupts to prevent any TX-related issues
+        ESP_ERROR_CHECK(uart_disable_tx_intr(port->port_num));
+
+        // Create event task for UART events
+        xTaskCreate(serial_uart_event_task, "uart_event_task", 2048, port, TASK_PRIORITY_UART_EVENT, &port->uart_task_handle);
+    } else if (has_valid_tx && !has_valid_rx) {
+        // Transmit-only mode - only TX pin is valid
+        port->uses_driver = true;
+        ESP_ERROR_CHECK(uart_driver_install(port->port_num, rx_buffer_size, port->config.tx_buffer_size, 10, &port->uart_queue, 0));
+        ESP_ERROR_CHECK(uart_set_pin(port->port_num, tx_pin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+
+        // Create event task for UART events
+        xTaskCreate(serial_uart_event_task, "uart_event_task", 2048, port, TASK_PRIORITY_UART_EVENT, &port->uart_task_handle);
     } else {
+        // Half-duplex mode - same pin for TX and RX, or invalid configuration
         port->uses_driver = false;
         port->buf_pos = 0;
         port->half_duplex_tx_mode = false;

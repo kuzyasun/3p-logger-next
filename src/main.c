@@ -3,6 +3,7 @@
 #include <version.h>
 
 #include "app_logic.h"
+#include "build_info.h"
 #include "esp_attr.h"
 #include "esp_log_level.h"
 #include "esp_rom_sys.h"

@@ -1,5 +1,8 @@
 #pragma once
 
+#define ESP32
+#define SERIAL_UNUSED_GPIO 22
+
 #define BUTTON_ENTER_GPIO 0
 
 #define COMP_1_OUT_GPIO 1
@@ -7,7 +10,8 @@
 #define COMP_3_OUT_GPIO 4
 #define COMP_4_OUT_GPIO 6
 
-#define UART1_RX_IN_GPIO 13
+#define UART1_RX_GPIO 13
+#define UART1_TX_GPIO 21
 
 #define ACC_INT_GPIO 5
 #define ACC_SPI_CLK_GPIO 7

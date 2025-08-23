@@ -3,18 +3,19 @@
 #include <esp_heap_caps.h>
 #include <esp_task_wdt.h>
 #include <esp_timer.h>
+#include <hal/gpio.h>
 #include <log.h>
 #include <stdlib.h>
 #include <string.h>
 #include <target.h>
 
-#include "serial.h"  // For SERIAL_UNUSED_GPIO
 #include "app_commands.h"
 #include "app_state.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "io/io_manager.h"
+#include "io/serial.h"
 #include "platform/system.h"
 
 static const char *TAG = "APPL";
@@ -37,13 +38,7 @@ void app_logic_init(app_logic_t *app, io_manager_t *io_manager, led_module_t *le
 
     // Configure UART1 for CRSF input
     LOG_I(TAG, "Configuring IO peripherals...");
-    io_manager_configure_uart(app->io_manager,
-                              &app->io_manager->uart1,
-                              app,
-                              PROTOCOL_CRSF,
-                              420000,
-                              UART1_RX_IN_GPIO,
-                              SERIAL_UNUSED_GPIO);
+    io_manager_configure_uart(app->io_manager, &app->io_manager->uart1, app, PROTOCOL_CRSF, 420000, UART1_RX_GPIO, SERIAL_UNUSED_GPIO);
 
     LOG_I(TAG, "Application Logic Initialized.");
 }
