@@ -407,14 +407,8 @@ bool crsf_process_frame(crsf_state_t *state, const uint8_t *frame_data, size_t f
             state->rc_channels[14] = ((ch_data[19] >> 2 | ch_data[20] << 6) & 0x07FF);
             state->rc_channels[15] = ((ch_data[20] >> 5 | ch_data[21] << 3) & 0x07FF);
 
-            app_state_t *app_state = app_state_get_instance();
-            app_state_begin_update();
-            memcpy(app_state->plane_rc_channels, state->rc_channels, sizeof(state->rc_channels));
-            app_state_set_u32(APP_STATE_FIELD_PLANE_RC_CHANNELS, (uint32_t *)&app_state->plane_rc_channels, 1);  // Trigger update
-            app_state_end_update();
-
-            LOG_D(TAG, "RC Channels: CH1=%u, CH2=%u, CH3=%u, CH4=%u ...", state->rc_channels[0], state->rc_channels[1], state->rc_channels[2],
-                  state->rc_channels[3]);
+            app_state_update_rc_channels(state->rc_channels, 16);
+            LOG_D(TAG, "RC Channels: Processed 16 channels.");
             return true;
         }
         case VTX_ID: {
