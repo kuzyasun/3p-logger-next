@@ -75,19 +75,21 @@ static void logger_task(void *arg) {
 }
 
 // --- Public API Implementation ---
-void logger_module_init(logger_module_t *module, hal_spi_bus_t sd_spi_bus) {
+hal_err_t logger_module_init(logger_module_t *module, hal_spi_bus_t sd_spi_bus) {
     memset(module, 0, sizeof(logger_module_t));
 
-    if (sdcard_init(sd_spi_bus, SD_SPI_CS_GPIO) != HAL_ERR_NONE) {
+    hal_err_t err = sdcard_init(sd_spi_bus, SD_SPI_CS_GPIO);
+    if (err != HAL_ERR_NONE) {
         LOG_E(TAG, "Failed to initialize SD card HAL. Logger disabled.");
         module->sd_card_ok = false;
-        return;
+        return err;
     }
 
-    if (sdcard_open_file("/log.bin", "w", &module->log_file) != HAL_ERR_NONE) {
+    err = sdcard_open_file("/log.bin", "w", &module->log_file);
+    if (err != HAL_ERR_NONE) {
         LOG_E(TAG, "Failed to create log file. Logger disabled.");
         module->sd_card_ok = false;
-        return;
+        return err;
     }
 
     module->sd_card_ok = true;
@@ -95,7 +97,7 @@ void logger_module_init(logger_module_t *module, hal_spi_bus_t sd_spi_bus) {
     if (module->buffer_queue == NULL) {
         LOG_E(TAG, "Failed to create buffer queue. Logger disabled.");
         module->sd_card_ok = false;
-        return;
+        return HAL_ERR_FAILED;
     }
     module->active_buffer = module->ping_buffer;
     module->active_buffer_idx = 0;
@@ -109,6 +111,7 @@ void logger_module_init(logger_module_t *module, hal_spi_bus_t sd_spi_bus) {
     }
 
     LOG_I(TAG, "Logger module initialized.");
+    return HAL_ERR_NONE;
 }
 
 void logger_module_create_task(logger_module_t *module) {

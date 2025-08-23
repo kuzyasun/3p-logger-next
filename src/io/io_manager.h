@@ -1,6 +1,7 @@
 #pragma once
 
 #include <hal/gpio_base.h>
+#include "hal_spi.h"
 
 #include "protocols/protocol.h"
 #include "protocols/protocol_parser.h"
@@ -32,9 +33,11 @@ typedef struct io_uart_s {
 typedef struct io_manager_s {
     io_uart_t uart1;
     io_uart_t uart2;
+    hal_spi_bus_t accel_spi_bus;
+    hal_spi_bus_t sdcard_spi_bus;
 } io_manager_t;
 
-void io_manager_init(io_manager_t *iom);
+hal_err_t io_manager_init(io_manager_t *iom);
 
 // Configure and open a UART port with a specific protocol parser
 void io_manager_configure_uart(io_manager_t *iom,

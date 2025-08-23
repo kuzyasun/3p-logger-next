@@ -23,8 +23,6 @@
 static const char *TAG = "APPL";
 
 static QueueHandle_t g_command_queue;
-extern accel_module_t g_accel_module;
-extern logger_module_t g_logger_module;
 
 void app_logic_init(app_logic_t *app, io_manager_t *io_manager, led_module_t *led_module) {
     app->io_manager = io_manager;
@@ -45,6 +43,41 @@ void app_logic_init(app_logic_t *app, io_manager_t *io_manager, led_module_t *le
     io_manager_configure_uart(app->io_manager, &app->io_manager->uart1, app, PROTOCOL_CRSF, 420000, UART1_RX_GPIO, SERIAL_UNUSED_GPIO);
 
     LOG_I(TAG, "Application Logic Initialized.");
+}
+
+app_err_t app_logic_init_modules(app_logic_t *app) {
+    LOG_I(TAG, "Initializing application modules...");
+    app_state_t *state = app_state_get_instance();
+
+    // Initialize Accelerometer
+    accel_config_t accel_cfg = {
+        .output_data_rate = LIS3DH_ODR_1kHz620_LP,
+        .full_scale = LIS3DH_2g,
+        .op_mode = LIS3DH_HR_12bit,
+        .spi_bus = app->io_manager->accel_spi_bus,
+        .cs_pin = ACC_SPI_CS_GPIO,
+    };
+    if (accel_module_init(&app->accel_module, &accel_cfg) != HAL_ERR_NONE) {
+        LOG_E(TAG, "Failed to initialize accelerometer module. Entering error state.");
+        app_state_begin_update();
+        app_state_set_u8(APP_STATE_FIELD_CURRENT_MODE, (uint8_t *)&state->current_mode, APP_MODE_ERROR);
+        state->system_error_code = APP_ERR_ACCEL_INIT_FAILED;
+        app_state_end_update();
+        return APP_ERR_ACCEL_INIT_FAILED;
+    }
+
+    // Initialize Logger
+    if (logger_module_init(&app->logger_module, app->io_manager->sdcard_spi_bus) != HAL_ERR_NONE) {
+        LOG_E(TAG, "Failed to initialize logger module. Entering error state.");
+        app_state_begin_update();
+        app_state_set_u8(APP_STATE_FIELD_CURRENT_MODE, (uint8_t *)&state->current_mode, APP_MODE_ERROR);
+        state->system_error_code = APP_ERR_LOGGER_INIT_FAILED;
+        app_state_end_update();
+        return APP_ERR_LOGGER_INIT_FAILED;
+    }
+
+    LOG_I(TAG, "All application modules initialized successfully.");
+    return APP_OK;
 }
 
 void app_logic_on_command(Notifier *notifier, Observer *observer, void *data) {
@@ -186,24 +219,32 @@ esp_err_t app_logic_start_all_tasks(app_logic_t *app) {
         LOG_I(TAG, "LED task created successfully");
     }
 
-    // Start Accel task
-    accel_module_create_task(&g_accel_module);
-    app->accel_task_handle = g_accel_module.task_handle;
-    if (app->accel_task_handle == NULL) {
-        LOG_E(TAG, "Failed to create accel_module_task");
-        result = ESP_FAIL;
+    // Start Accel task CONDITIONALLY
+    if (app->accel_module.initialized) {
+        accel_module_create_task(&app->accel_module);
+        app->accel_task_handle = app->accel_module.task_handle;
+        if (app->accel_task_handle == NULL) {
+            LOG_E(TAG, "Failed to create accel_module_task");
+            result = ESP_FAIL;
+        } else {
+            LOG_I(TAG, "accel_module_task created successfully");
+        }
     } else {
-        LOG_I(TAG, "accel_module_task created successfully");
+        LOG_W(TAG, "Skipping accel_module_task creation, module not initialized.");
     }
 
-    // Start Logger task
-    logger_module_create_task(&g_logger_module);
-    app->logger_task_handle = g_logger_module.task_handle;
-    if (app->logger_task_handle == NULL) {
-        LOG_E(TAG, "Failed to create logger_task");
-        result = ESP_FAIL;
+    // Start Logger task CONDITIONALLY
+    if (app->logger_module.sd_card_ok) {
+        logger_module_create_task(&app->logger_module);
+        app->logger_task_handle = app->logger_module.task_handle;
+        if (app->logger_task_handle == NULL) {
+            LOG_E(TAG, "Failed to create logger_task");
+            result = ESP_FAIL;
+        } else {
+            LOG_I(TAG, "logger_task created successfully");
+        }
     } else {
-        LOG_I(TAG, "logger_task created successfully");
+        LOG_W(TAG, "Skipping logger_task creation, module not initialized.");
     }
 
     // Start test mode cycle task
