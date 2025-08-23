@@ -1,0 +1,495 @@
+Plaintext
+
+Here is a detailed, step-by-step plan for implementing the requested changes.
+
+---
+### Part 1: Configuration Management (`config_manager` Module)
+---
+
+**Objective:** Create a centralized module to load system parameters from `/sdcard/configuration.txt`. If the file is not found, use hardcoded default values.
+
+**1.1. Create `config_manager.h`**
+
+-   Define a new structure `app_config_t` to hold all configurable parameters.
+-   Declare a function `config_manager_load()` to perform the loading.
+-   Declare an external global instance of the config.
+
+```c
+// src/config_manager.h
+
+#pragma once
+
+#include <stdbool.h>
+#include "modules/accel_module.h"
+#include "protocols/protocol.h"
+
+#define MAX_LOG_TELEMETRY_PARAMS 16
+#define MAX_PARAM_NAME_LEN 32
+
+// New expanded config for accelerometer based on register analysis
+typedef struct {
+    lis3dh_odr_t output_data_rate;
+    lis3dh_fs_t full_scale;
+    lis3dh_op_md_t op_mode;
+    bool bdu_enabled;
+    bool data_ready_interrupt_enabled;
+    hal_spi_bus_t spi_bus;
+    hal_gpio_t cs_pin;
+} extended_accel_config_t;
+
+// Main application configuration structure
+typedef struct {
+    // Accelerometer settings
+    extended_accel_config_t accel_config;
+
+    // Piezo module settings
+    uint8_t pz_dac1_threshold;
+    uint8_t pz_dac2_threshold;
+
+    // UART1 settings
+    protocol_e uart1_protocol;
+    int uart1_baudrate;
+    
+    // Dynamic telemetry logging settings
+    int telemetry_params_count;
+    char telemetry_params[MAX_LOG_TELEMETRY_PARAMS][MAX_PARAM_NAME_LEN];
+
+} app_config_t;
+
+// Public Global instance
+extern app_config_t g_app_config;
+
+// Public API
+// Loads configuration from SD card. Returns true on success, false on failure.
+bool config_manager_load(void);
+
+1.2. Create config_manager.c
+
+Implement config_manager_load() and helper functions for parsing.
+
+C
+
+// src/config_manager.c
+
+#include "config_manager.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include "log.h"
+#include "target.h" // For default GPIOs etc.
+
+static const char *TAG = "CONFIG";
+
+// Define the global config instance
+app_config_t g_app_config;
+
+// Forward declaration of helper functions
+static void set_default_config(void);
+static void parse_line(char *line);
+// ... plus string-to-enum/value conversion helpers ...
+
+void set_default_config(void) {
+    // Accel defaults
+    g_app_config.accel_config.output_data_rate = LIS3DH_ODR_400Hz;
+    g_app_config.accel_config.full_scale = LIS3DH_16g;
+    g_app_config.accel_config.op_mode = LIS3DH_HR_12bit;
+    g_app_config.accel_config.bdu_enabled = true;
+    g_app_config.accel_config.data_ready_interrupt_enabled = true;
+    g_app_config.accel_config.spi_bus = ACCEL_SPI_HOST; // Assuming this is defined
+    g_app_config.accel_config.cs_pin = ACC_SPI_CS_GPIO;
+    
+    // Piezo defaults
+    g_app_config.pz_dac1_threshold = 128;
+    g_app_config.pz_dac2_threshold = 128;
+    
+    // UART1 defaults
+    g_app_config.uart1_protocol = PROTOCOL_CRSF;
+    g_app_config.uart1_baudrate = 420000;
+    
+    // Telemetry defaults (log nothing extra by default)
+    g_app_config.telemetry_params_count = 0;
+}
+
+// Implement string parsing helpers here...
+// Example: lis3dh_odr_t str_to_odr(const char* str) { ... }
+
+void parse_line(char* line) {
+    char* key = strtok(line, "=");
+    char* value = strtok(NULL, "\n\r");
+
+    if (!key || !value) return;
+
+    // Example parsing logic
+    if (strcmp(key, "ACCEL_ODR") == 0) {
+        // g_app_config.accel_config.output_data_rate = str_to_odr(value);
+    } else if (strcmp(key, "PZ_THRESHOLD_1") == 0) {
+        g_app_config.pz_dac1_threshold = atoi(value);
+    } else if (strcmp(key, "LOG_TELEMETRY") == 0) {
+        // Parse comma-separated list
+        char* token = strtok(value, ",");
+        g_app_config.telemetry_params_count = 0;
+        while(token != NULL && g_app_config.telemetry_params_count < MAX_LOG_TELEMETRY_PARAMS) {
+            // Trim whitespace if necessary
+            strncpy(g_app_config.telemetry_params[g_app_config.telemetry_params_count], token, MAX_PARAM_NAME_LEN - 1);
+            g_app_config.telemetry_params_count++;
+            token = strtok(NULL, ",");
+        }
+    }
+    // ... add parsers for all other keys ...
+}
+
+bool config_manager_load(void) {
+    set_default_config();
+
+    FILE* f = fopen("/sdcard/configuration.txt", "r");
+    if (!f) {
+        LOG_W(TAG, "configuration.txt not found, using default values.");
+        return false;
+    }
+
+    LOG_I(TAG, "Loading configuration from /sdcard/configuration.txt");
+    char line[128];
+    while (fgets(line, sizeof(line), f)) {
+        // Ignore comments and empty lines
+        if (line[0] == '#' || line[0] == '\n' || line[0] == '\r') {
+            continue;
+        }
+        parse_line(line);
+    }
+
+    fclose(f);
+    return true;
+}
+
+1.3. Modify app_logic.c to use config_manager
+
+Change the startup sequence to load the configuration before initializing modules.
+
+Pass the loaded configuration to the module initialization functions.
+
+C
+
+// src/app_logic.c
+
+// ... includes ...
+#include "config_manager.h" // Add this include
+
+// ...
+
+void app_logic_init(app_logic_t *app) {
+    LOG_I(TAG, "Initializing Application Logic...");
+
+    // IO Manager must be first to access SD card
+    app->io_manager = calloc(1, sizeof(io_manager_t));
+    io_manager_init(app->io_manager);
+
+    // Mount SD card before trying to load config
+    // This assumes sdcard_init mounts the filesystem.
+    if (sdcard_init(app->io_manager->sdcard_spi_bus, SD_SPI_CS_GPIO) != HAL_ERR_NONE) {
+        LOG_E(TAG, "Failed to mount SD card. Cannot load config or use logger.");
+    } else {
+        // Load configuration now that SD card is available
+        config_manager_load();
+    }
+    
+    // ... rest of the initializations for led, accel, logger, pz modules ...
+    // ... calloc memory for them but do not run their specific init yet ...
+}
+
+app_err_t app_logic_init_modules(app_logic_t *app) {
+    LOG_I(TAG, "Initializing application modules with loaded config...");
+    app_state_t *state = app_state_get_instance();
+
+    // Configure UART1 based on loaded config
+    io_manager_configure_uart(app->io_manager, &app->io_manager->uart1, app, 
+                              g_app_config.uart1_protocol, 
+                              g_app_config.uart1_baudrate, 
+                              UART1_RX_GPIO, SERIAL_UNUSED_GPIO);
+
+    // Initialize Accelerometer with loaded config
+    if (accel_module_init(app->accel_module, &g_app_config.accel_config) != HAL_ERR_NONE) {
+        // ... handle error ...
+        return APP_ERR_ACCEL_INIT_FAILED;
+    }
+
+    // Initialize Logger (this will now handle its own directory logic)
+    if (logger_module_init(app->logger_module, app->io_manager->sdcard_spi_bus) != HAL_ERR_NONE) {
+        // ... handle error ...
+        return APP_ERR_LOGGER_INIT_FAILED;
+    }
+
+    // Initialize Piezo
+    if (pz_module_init(app->pz_module) != APP_OK) {
+        // ... handle error ...
+        return APP_ERR_GENERIC;
+    }
+    // Set Piezo threshold from loaded config
+    pz_module_set_threshold(g_app_config.pz_dac1_threshold, g_app_config.pz_dac2_threshold);
+
+    LOG_I(TAG, "All application modules initialized successfully.");
+    return APP_OK;
+}
+
+Part 2: Accelerometer Module Enhancement
+Objective: Update the accelerometer module to use the new expanded configuration struct.
+
+2.1. Modify accel_module.h
+
+Replace accel_config_t with the new extended_accel_config_t from config_manager.h. It's better to move the definition of extended_accel_config_t into accel_module.h and include accel_module.h in config_manager.h to avoid circular dependencies.
+
+C
+
+// src/modules/accel_module.h
+
+#pragma once
+// ... includes ...
+#include "lis3dh_reg.h"
+
+// Define the expanded config struct here
+typedef struct {
+    lis3dh_odr_t output_data_rate;
+    lis3dh_fs_t full_scale;
+    lis3dh_op_md_t op_mode;
+    bool bdu_enabled;
+    bool data_ready_interrupt_enabled;
+    hal_spi_bus_t spi_bus;
+    hal_gpio_t cs_pin;
+} accel_config_t; // Keep original name for compatibility within module
+
+// ... rest of the file ...
+hal_err_t accel_module_init(accel_module_t *module, const accel_config_t *config);
+2.2. Modify accel_module.c
+
+Update accel_module_init to configure the newly added parameters.
+
+C
+
+// src/modules/accel_module.c
+
+hal_err_t accel_module_init(accel_module_t *module, const accel_config_t *config) {
+    // ... existing setup for SPI device and driver_ctx ...
+    
+    // Check WhoAmI
+    // ...
+    
+    lis3dh_boot_set(&module->driver_ctx, PROPERTY_ENABLE);
+    platform_delay(10);
+
+    // Apply configuration from the passed struct
+    lis3dh_operating_mode_set(&module->driver_ctx, module->config.op_mode);
+    lis3dh_full_scale_set(&module->driver_ctx, module->config.full_scale);
+    lis3dh_data_rate_set(&module->driver_ctx, module->config.output_data_rate);
+    
+    // Use the new config fields
+    lis3dh_block_data_update_set(&module->driver_ctx, module->config.bdu_enabled ? PROPERTY_ENABLE : PROPERTY_DISABLE);
+
+    if(module->config.data_ready_interrupt_enabled) {
+        lis3dh_ctrl_reg3_t int_config = { .i1_zyxda = 1 }; // Enable data ready on INT1
+        lis3dh_pin_int1_config_set(&module->driver_ctx, &int_config);
+    }
+
+    LOG_I(TAG, "LIS3DH initialized successfully.");
+    module->initialized = true;
+    return HAL_ERR_NONE;
+}
+Part 3: Logger Module Refactoring
+Objective: Modify the logger to create a new numbered directory for each session, copy the config file into it, and handle dynamic telemetry logging.
+
+3.1. Add File System Utilities to sdcard HAL
+
+The current sdcard.c uses esp_vfs_fat, so standard POSIX-like functions should work on the mount point. We need to add wrappers in sdcard.h and sdcard.c for stat and mkdir for a clean HAL.
+
+C
+
+// src/hal/sdcard.h (Additions)
+#include <sys/stat.h> // For struct stat
+
+// ... existing declarations ...
+hal_err_t sdcard_stat(const char *path, struct stat *st);
+hal_err_t sdcard_mkdir(const char *path);
+
+
+// src/hal/sdcard.c (Additions)
+// ...
+#include <sys/stat.h>
+
+hal_err_t sdcard_stat(const char *path, struct stat *st) {
+    if (stat(path, st) == 0) {
+        return HAL_ERR_NONE;
+    }
+    return HAL_ERR_FAILED;
+}
+
+hal_err_t sdcard_mkdir(const char *path) {
+    if (mkdir(path, 0755) == 0) {
+        return HAL_ERR_NONE;
+    }
+    return HAL_ERR_FAILED;
+}
+
+3.2. Update logger_module.c
+
+Rewrite logger_module_init for new directory logic.
+
+Implement dynamic record creation.
+
+C
+
+// src/modules/logger_module.c
+
+// ... includes ...
+#include "config_manager.h"
+#include <sys/stat.h>
+#include <stddef.h> // for offsetof
+
+// Define a struct to hold the "log plan"
+typedef struct {
+    app_state_field_mask_e field_mask;
+    size_t offset;
+    size_t size;
+} log_param_map_t;
+
+// Add to logger_module_t struct in logger_module.h
+// ...
+// log_param_map_t log_map[MAX_LOG_TELEMETRY_PARAMS];
+// int log_map_count;
+// size_t dynamic_record_size;
+// ...
+
+
+// Helper to copy file
+static hal_err_t copy_config_file(const char* dst_path) {
+    FILE* src = fopen("/sdcard/configuration.txt", "r");
+    if (!src) return HAL_ERR_FAILED;
+
+    FILE* dst = fopen(dst_path, "w");
+    if (!dst) {
+        fclose(src);
+        return HAL_ERR_FAILED;
+    }
+
+    char buffer[128];
+    size_t bytes_read;
+    while ((bytes_read = fread(buffer, 1, sizeof(buffer), src)) > 0) {
+        fwrite(buffer, 1, bytes_read, dst);
+    }
+
+    fclose(src);
+    fclose(dst);
+    return HAL_ERR_NONE;
+}
+
+// New helper to build the log plan for performance
+static void build_log_plan(logger_module_t* module) {
+    app_state_t* state = app_state_get_instance();
+    module->log_map_count = 0;
+    
+    // Fixed part of the record
+    module->dynamic_record_size = 7; // 6 bytes accel + 1 byte piezo
+
+    for (int i = 0; i < g_app_config.telemetry_params_count; ++i) {
+        const char* param_name = g_app_config.telemetry_params[i];
+        log_param_map_t* map_entry = &module->log_map[module->log_map_count];
+        
+        // This is a large but necessary mapping
+        if (strcmp(param_name, "plane_speed") == 0) {
+            map_entry->field_mask = APP_STATE_FIELD_PLANE_SPEED;
+            map_entry->offset = offsetof(app_state_t, plane_speed);
+            map_entry->size = sizeof(state->plane_speed);
+        } else if (strcmp(param_name, "plane_fused_altitude") == 0) {
+            map_entry->field_mask = APP_STATE_FIELD_PLANE_FUSED_ALTITUDE;
+            map_entry->offset = offsetof(app_state_t, plane_fused_altitude);
+            map_entry->size = sizeof(state->plane_fused_altitude);
+        }
+        // ... add else-if for EVERY possible telemetry parameter ...
+
+        module->dynamic_record_size += map_entry->size;
+        module->log_map_count++;
+    }
+}
+
+
+// REWRITE of logger_module_init
+hal_err_t logger_module_init(logger_module_t *module, hal_spi_bus_t sd_spi_bus) {
+    memset(module, 0, sizeof(logger_module_t));
+
+    // SD card should already be initialized by app_logic
+    module->sd_card_ok = true; // Assume ok for now
+
+    // 1. Find next available log directory
+    int log_num = 0;
+    char log_dir_path[32];
+    struct stat st;
+    while (true) {
+        sprintf(log_dir_path, "/sdcard/%d", log_num);
+        if (stat(log_dir_path, &st) != 0) {
+            break; // Directory does not exist, we found our number
+        }
+        log_num++;
+    }
+
+    // 2. Create the new directory
+    if (mkdir(log_dir_path, 0755) != 0) {
+        LOG_E(TAG, "Failed to create log directory %s", log_dir_path);
+        module->sd_card_ok = false;
+        return HAL_ERR_FAILED;
+    }
+
+    // 3. Copy config file
+    char config_path[64];
+    sprintf(config_path, "%s/configuration.txt", log_dir_path);
+    copy_config_file(config_path);
+
+    // 4. Create the main log file
+    char log_file_path[64];
+    sprintf(log_file_path, "%s/%d.log", log_dir_path, log_num);
+    hal_err_t err = sdcard_open_file(log_file_path, "w", &module->log_file);
+    if (err != HAL_ERR_NONE) {
+        LOG_E(TAG, "Failed to create log file %s", log_file_path);
+        module->sd_card_ok = false;
+        return err;
+    }
+
+    // 5. Build the logging plan based on config
+    build_log_plan(module);
+
+    // ... rest of initialization (buffers, queue, observer) ...
+    // ...
+
+    LOG_I(TAG, "Logger initialized. Logging to %s. Record size: %d bytes.", log_file_path, module->dynamic_record_size);
+    module->initialized = true;
+    return HAL_ERR_NONE;
+}
+
+// REWRITE of on_app_state_change
+static void on_app_state_change(Notifier *notifier, Observer *observer, void *data) {
+    logger_module_t *module = (logger_module_t *)observer->context;
+    // ... checks for sd_card_ok and trigger mask ...
+    
+    app_state_t *state = app_state_get_instance();
+    uint8_t record[module->dynamic_record_size];
+    size_t current_offset = 0;
+
+    // 1. Write fixed data
+    memcpy(&record[current_offset], &state->accel_x, 2); current_offset += 2;
+    memcpy(&record[current_offset], &state->accel_y, 2); current_offset += 2;
+    memcpy(&record[current_offset], &state->accel_z, 2); current_offset += 2;
+    memcpy(&record[current_offset], &state->piezo_mask, 1); current_offset += 1;
+    
+    // 2. Write dynamic telemetry data based on the plan
+    for (int i = 0; i < module->log_map_count; i++) {
+        log_param_map_t* map_entry = &module->log_map[i];
+        memcpy(&record[current_offset], (uint8_t*)state + map_entry->offset, map_entry->size);
+        current_offset += map_entry->size;
+    }
+
+    // 3. Buffer management logic (remains the same, but uses dynamic_record_size)
+    if (module->active_buffer_idx + module->dynamic_record_size > LOGGER_BUFFER_SIZE) {
+        // swap buffers
+    }
+    memcpy(module->active_buffer + module->active_buffer_idx, record, module->dynamic_record_size);
+    module->active_buffer_idx += module->dynamic_record_size;
+
+    // check for full buffer again
+    // ...
+}
