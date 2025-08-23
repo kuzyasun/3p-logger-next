@@ -75,7 +75,7 @@ static const char *TAG = "Main";
 static io_manager_t io_manager;
 static app_logic_t app_logic;
 static led_module_t led_module;
-static accel_module_t g_accel_module;
+accel_module_t g_accel_module;
 
 void app_main() {
     usb_boot_cmd_start();
