@@ -8,6 +8,7 @@
 #include <string.h>
 #include <target.h>
 
+#include "serial.h"  // For SERIAL_UNUSED_GPIO
 #include "app_commands.h"
 #include "app_state.h"
 #include "freertos/FreeRTOS.h"
@@ -25,6 +26,24 @@ void app_logic_init(app_logic_t *app, io_manager_t *io_manager, led_module_t *le
     app->led_module = led_module;
 
     g_command_queue = xQueueCreate(20, sizeof(app_command_t));
+
+    // Initialize all protocol parsers
+    nmea_parser_init(&app->nmea_parser);
+    crsf_parser_init(&app->crsf_parser);
+    ublox_parser_init(&app->ublox_parser);
+    msp_parser_init(&app->msp_parser);
+    msp_v2_parser_init(&app->msp_v2_parser);
+    mavlink_parser_init(&app->mavlink_parser);
+
+    // Configure UART1 for CRSF input
+    LOG_I(TAG, "Configuring IO peripherals...");
+    io_manager_configure_uart(app->io_manager,
+                              &app->io_manager->uart1,
+                              app,
+                              PROTOCOL_CRSF,
+                              420000,
+                              UART1_RX_IN_GPIO,
+                              SERIAL_UNUSED_GPIO);
 
     LOG_I(TAG, "Application Logic Initialized.");
 }

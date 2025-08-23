@@ -7,16 +7,20 @@
 #include <target.h>
 
 #include "app_state.h"
+#include "app_logic.h"
 
 static const char *TAG = "IOM";
 
-// ESP-NOW protocol packet structure (matching the one in wifi.c)
-#define MAX_PROTOCOL_PACKET_SIZE 250
-typedef struct {
-    uint8_t data[MAX_PROTOCOL_PACKET_SIZE];
-    size_t len;
-    uint8_t sender_mac[6];
-} protocol_packet_t;
+/**
+ * @brief Callback invoked by the serial driver for every received byte.
+ */
+static void uart_byte_received_callback(const serial_port_t *port, uint8_t b, void *user_data) {
+    (void)port;
+    io_uart_t *uart = (io_uart_t *)user_data;
+    if (uart && uart->parser && uart->parser->vtable.process_byte) {
+        uart->parser->vtable.process_byte(uart->parser->state, b);
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -30,14 +34,83 @@ void io_manager_init(io_manager_t *iom) {
     LOG_I(TAG, "IO Manager Initialized");
 }
 
+void io_manager_configure_uart(io_manager_t *iom,
+                               io_uart_t *uart,
+                               struct app_logic_s *app_logic,
+                               protocol_e protocol,
+                               int baudrate,
+                               hal_gpio_t rx_pin,
+                               hal_gpio_t tx_pin) {
+    (void)iom;
+
+    // Select parser based on protocol
+    switch (protocol) {
+        case PROTOCOL_CRSF:
+            uart->parser = &app_logic->crsf_parser.parser;
+            break;
+        case PROTOCOL_NMEA:
+            uart->parser = &app_logic->nmea_parser.parser;
+            break;
+        case PROTOCOL_UBLOX:
+            uart->parser = &app_logic->ublox_parser.parser;
+            break;
+        case PROTOCOL_MSP:
+            uart->parser = &app_logic->msp_parser.parser;
+            break;
+        case PROTOCOL_MSP_V2:
+            uart->parser = &app_logic->msp_v2_parser.parser;
+            break;
+        case PROTOCOL_MAVLINK:
+            uart->parser = &app_logic->mavlink_parser.parser;
+            break;
+        default:
+            uart->parser = NULL;
+            LOG_W(TAG, "No parser assigned for protocol ID: %d", protocol);
+            break;
+    }
+
+    if (uart->parser && !uart->parser->is_initialized && uart->parser->vtable.init) {
+        uart->parser->vtable.init(uart->parser->state);
+        uart->parser->is_initialized = true;
+    }
+
+    uart->protocol = protocol;
+    uart->baudrate = baudrate;
+    uart->gpio_rx = rx_pin;
+    uart->gpio_tx = tx_pin;
+
+    serial_port_config_t serial_config = {
+        .baud_rate = uart->baudrate,
+        .rx_pin = uart->gpio_rx,
+        .tx_pin = uart->gpio_tx,
+        .rx_buffer_size = 1024,
+        .tx_buffer_size = 256,
+        .inverted = false,
+        .parity = SERIAL_PARITY_DISABLE,
+        .stop_bits = SERIAL_STOP_BITS_1,
+        .byte_callback = uart_byte_received_callback,
+        .byte_callback_data = uart,
+    };
+
+    uart->serial_port = serial_port_open(&serial_config);
+
+    if (uart->serial_port) {
+        uart->io_runing = true;
+        LOG_I(TAG,
+              "Successfully configured UART with protocol %d on RX:%d/TX:%d at %d baud.",
+              protocol,
+              rx_pin,
+              tx_pin,
+              baudrate);
+    } else {
+        uart->io_runing = false;
+        LOG_E(TAG, "Failed to open serial port for protocol %d.", protocol);
+    }
+}
+
 void io_manager_task(void *arg) {
-    io_manager_t *iom = (io_manager_t *)arg;
-    app_state_t *state = app_state_get_instance();
-
+    (void)arg;
     while (true) {
-        // TODO update UARTS
-        // TODO update SPI Buses
-
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
