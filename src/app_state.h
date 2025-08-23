@@ -86,17 +86,19 @@ typedef enum {
     APP_STATE_FIELD_PLANE_GPS_DATE_DAY = (1ULL << 57),
     APP_STATE_FIELD_PLANE_GPS_DATE_MONTH = (1ULL << 58),
     APP_STATE_FIELD_PLANE_GPS_DATE_YEAR = (1ULL << 59),
+    APP_STATE_FIELD_CURRENT_MODE = (1ULL << 60),
 
 } app_state_field_mask_e;
 
 typedef enum {
-    APP_MODE_IDLE,
-    APP_MODE_LOGGING,
-    APP_MODE_ERROR,
+    APP_MODE_IDLE = 0,
+    APP_MODE_LOGGING = 1,
+    APP_MODE_ERROR = 2,
 } app_mode_t;
 
 typedef struct app_state_s {
     app_err_t system_error_code;
+    app_mode_t current_mode;  // Current application mode
     // Plane telemetry
     int32_t plane_longitude;
     int32_t plane_latitude;

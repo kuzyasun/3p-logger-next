@@ -1,9 +1,14 @@
 #include "led_module.h"
 
+#include "app_state.h"
+#include "util/observer.h"
+
 static const char *TAG = "LED";
 
-// Task to blink the board LED every second
+// Task to blink the board LED based on app mode
 void led_blink_task(void *pvParameters) {
+    led_module_t *led_module = (led_module_t *)pvParameters;
+
     // Setup GPIO pin as output
     hal_gpio_setup(BOARDLED_PIN, HAL_GPIO_DIR_OUTPUT, HAL_GPIO_PULL_NONE);
 
@@ -12,17 +17,48 @@ void led_blink_task(void *pvParameters) {
     while (1) {
         // Turn LED on
         hal_gpio_set_level(BOARDLED_PIN, HAL_GPIO_HIGH);
-        // LOG_I(TAG, "LED ON");  // Commented out to reduce stack usage
 
-        // Wait 500ms
-        vTaskDelay(500 / portTICK_PERIOD_MS);
+        // Wait time depends on current mode
+        TickType_t on_delay;
+        TickType_t off_delay;
+
+        switch (led_module->current_mode) {
+            case APP_MODE_LOGGING:
+                // Fast blink for logging mode
+                on_delay = pdMS_TO_TICKS(100);
+                off_delay = pdMS_TO_TICKS(100);
+                break;
+            case APP_MODE_ERROR:
+                // Very fast blink for error mode
+                on_delay = pdMS_TO_TICKS(50);
+                off_delay = pdMS_TO_TICKS(50);
+                break;
+            case APP_MODE_IDLE:
+            default:
+                // Normal blink for idle mode
+                on_delay = pdMS_TO_TICKS(500);
+                off_delay = pdMS_TO_TICKS(500);
+                break;
+        }
+
+        vTaskDelay(on_delay);
 
         // Turn LED off
         hal_gpio_set_level(BOARDLED_PIN, HAL_GPIO_LOW);
-        LOG_I(TAG, "LED OFF");  // Commented out to reduce stack usage
 
-        // Wait 500ms (total 1 second cycle)
-        vTaskDelay(500 / portTICK_PERIOD_MS);
+        vTaskDelay(off_delay);
+    }
+}
+
+void led_module_on_app_state_change(Notifier *notifier, Observer *observer, void *data) {
+    led_module_t *led_module = (led_module_t *)observer->context;
+    uint64_t *changed_mask = (uint64_t *)data;
+
+    // Check if the mode field changed
+    if (*changed_mask & APP_STATE_FIELD_CURRENT_MODE) {
+        app_state_t *app_state = app_state_get_instance();
+        led_module->current_mode = app_state->current_mode;
+        LOG_I(TAG, "LED mode changed to: %d", led_module->current_mode);
     }
 }
 
@@ -32,6 +68,17 @@ void led_module_init(led_module_t *led_module) {
     }
 
     led_module->is_initialized = true;
+    led_module->current_mode = APP_MODE_IDLE;  // Default to idle mode
+
+    // Subscribe to app state changes
+    led_module->app_state_observer = ObserverCreate("LED_APP_STATE", led_module, led_module_on_app_state_change, NULL);
+    if (led_module->app_state_observer) {
+        Notifier *app_state_notifier = app_state_get_notifier();
+        if (app_state_notifier) {
+            app_state_notifier->subject.attach(app_state_notifier, led_module->app_state_observer);
+            LOG_I(TAG, "LED module subscribed to app state changes");
+        }
+    }
 
     LOG_I(TAG, "LED module initialized");
 }

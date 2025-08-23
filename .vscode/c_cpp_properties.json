@@ -186,6 +186,7 @@
                 "C:/Users/smartyniuk/.platformio/packages/framework-espidf/components/wifi_provisioning/include",
                 "C:/projects/3p/3p-logger-next/components",
                 "c:/projects/3p/3p-logger-next/components/mavlink",
+                "c:/projects/3p/3p-logger-next/lib/stm-lis3dh",
                 ""
             ],
             "browse": {
@@ -369,6 +370,7 @@
                     "C:/Users/smartyniuk/.platformio/packages/framework-espidf/components/wifi_provisioning/include",
                     "C:/projects/3p/3p-logger-next/components",
                     "c:/projects/3p/3p-logger-next/components/mavlink",
+                    "c:/projects/3p/3p-logger-next/lib/stm-lis3dh",
                     ""
                 ]
             },

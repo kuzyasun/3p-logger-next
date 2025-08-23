@@ -3,6 +3,7 @@
 #include <version.h>
 
 #include "app_logic.h"
+#include "app_state.h"
 #include "build_info.h"
 #include "esp_attr.h"
 #include "esp_log_level.h"
@@ -97,6 +98,7 @@ void app_main() {
     LOG_I(TAG, "ESP32 CPU Cores: %lu", system_get_cpu_cores());
     LOG_I(TAG, "ESP32 Flash Size: %lu", system_get_flash_size_bytes());
 
+    app_state_init();  // Initialize app state first
     io_manager_init(&io_manager);
     led_module_init(&led_module);
 

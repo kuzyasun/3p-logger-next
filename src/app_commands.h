@@ -7,6 +7,9 @@
 
 typedef enum {
     APP_CMD_NONE,
+    APP_CMD_SET_MODE_IDLE,
+    APP_CMD_SET_MODE_LOGGING,
+    APP_CMD_SET_MODE_ERROR,
 } app_command_id_e;
 
 typedef struct {

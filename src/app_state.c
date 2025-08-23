@@ -9,6 +9,7 @@ static app_state_t g_app_state;
 
 void app_state_init(void) {
     memset(&g_app_state, 0, sizeof(g_app_state));
+    g_app_state.current_mode = APP_MODE_IDLE;  // Initialize with idle mode
     g_app_state.changed_notifier = NotifierCreate(&g_app_state);
     g_app_state.state_mutex = xSemaphoreCreateMutex();
 }

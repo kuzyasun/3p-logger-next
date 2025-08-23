@@ -92,6 +92,24 @@ static app_err_t _app_logic_handle_command(app_logic_t *app, app_command_t *cmd)
     app_err_t result = APP_OK;
     app_state_t *state = app_state_get_instance();
     switch (cmd->id) {
+        case APP_CMD_SET_MODE_IDLE:
+            app_state_begin_update();
+            app_state_set_u8(APP_STATE_FIELD_CURRENT_MODE, (uint8_t *)&state->current_mode, APP_MODE_IDLE);
+            app_state_end_update();
+            LOG_I(TAG, "Mode changed to IDLE");
+            break;
+        case APP_CMD_SET_MODE_LOGGING:
+            app_state_begin_update();
+            app_state_set_u8(APP_STATE_FIELD_CURRENT_MODE, (uint8_t *)&state->current_mode, APP_MODE_LOGGING);
+            app_state_end_update();
+            LOG_I(TAG, "Mode changed to LOGGING");
+            break;
+        case APP_CMD_SET_MODE_ERROR:
+            app_state_begin_update();
+            app_state_set_u8(APP_STATE_FIELD_CURRENT_MODE, (uint8_t *)&state->current_mode, APP_MODE_ERROR);
+            app_state_end_update();
+            LOG_I(TAG, "Mode changed to ERROR");
+            break;
         default:
             LOG_W(TAG, "Received unhandled application command: %d", cmd->id);
             result = APP_ERR_UNKNOWN_COMMAND;
@@ -99,6 +117,31 @@ static app_err_t _app_logic_handle_command(app_logic_t *app, app_command_t *cmd)
     }
 
     return result;
+}
+
+// Test task to cycle through modes for demonstration
+static void test_mode_cycle_task(void *pvParameters) {
+    app_logic_t *app = (app_logic_t *)pvParameters;
+
+    LOG_I(TAG, "Test mode cycle task started");
+
+    // Wait a bit for system to stabilize
+    vTaskDelay(pdMS_TO_TICKS(2000));
+
+    while (1) {
+        // Cycle through modes: IDLE -> LOGGING -> ERROR -> IDLE
+        LOG_I(TAG, "Setting mode to IDLE");
+        app_logic_send_command(app, APP_CMD_SET_MODE_IDLE);
+        vTaskDelay(pdMS_TO_TICKS(5000));  // 5 seconds in IDLE
+
+        LOG_I(TAG, "Setting mode to LOGGING");
+        app_logic_send_command(app, APP_CMD_SET_MODE_LOGGING);
+        vTaskDelay(pdMS_TO_TICKS(5000));  // 5 seconds in LOGGING
+
+        LOG_I(TAG, "Setting mode to ERROR");
+        app_logic_send_command(app, APP_CMD_SET_MODE_ERROR);
+        vTaskDelay(pdMS_TO_TICKS(5000));  // 5 seconds in ERROR
+    }
 }
 
 // ============================================================================
@@ -137,6 +180,15 @@ esp_err_t app_logic_start_all_tasks(app_logic_t *app) {
         result = ESP_FAIL;
     } else {
         LOG_I(TAG, "LED blink task created successfully");
+    }
+
+    // Start test mode cycle task
+    BaseType_t test_ret = xTaskCreatePinnedToCore(test_mode_cycle_task, "TEST_MODE", 4096, app, TASK_PRIORITY_DEFAULT, NULL, 0);
+    if (test_ret != pdPASS) {
+        LOG_E(TAG, "Failed to create test mode cycle task");
+        result = ESP_FAIL;
+    } else {
+        LOG_I(TAG, "Test mode cycle task created successfully");
     }
 
     return result;
