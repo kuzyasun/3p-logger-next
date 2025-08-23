@@ -54,6 +54,13 @@ static void logger_task(void *arg) {
     logger_module_t *module = (logger_module_t *)arg;
     uint8_t *buffer = NULL;
 
+    // Safety check - if queue is NULL, task should not run
+    if (module->buffer_queue == NULL) {
+        LOG_E(TAG, "Logger task started with NULL buffer queue. Task exiting.");
+        vTaskDelete(NULL);
+        return;
+    }
+
     while (1) {
         if (xQueueReceive(module->buffer_queue, &buffer, portMAX_DELAY) == pdTRUE) {
             if (module->sd_card_ok) {
@@ -71,7 +78,7 @@ static void logger_task(void *arg) {
 void logger_module_init(logger_module_t *module, hal_spi_bus_t sd_spi_bus) {
     memset(module, 0, sizeof(logger_module_t));
 
-    if (sdcard_init(sd_spi_bus) != HAL_ERR_NONE) {
+    if (sdcard_init(sd_spi_bus, SD_SPI_CS_GPIO) != HAL_ERR_NONE) {
         LOG_E(TAG, "Failed to initialize SD card HAL. Logger disabled.");
         module->sd_card_ok = false;
         return;
@@ -85,6 +92,11 @@ void logger_module_init(logger_module_t *module, hal_spi_bus_t sd_spi_bus) {
 
     module->sd_card_ok = true;
     module->buffer_queue = xQueueCreate(2, sizeof(uint8_t *));
+    if (module->buffer_queue == NULL) {
+        LOG_E(TAG, "Failed to create buffer queue. Logger disabled.");
+        module->sd_card_ok = false;
+        return;
+    }
     module->active_buffer = module->ping_buffer;
     module->active_buffer_idx = 0;
 

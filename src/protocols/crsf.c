@@ -73,7 +73,7 @@ void crsf_parser_init(crsf_parser_t *instance) {
     };
     alt_fuser_init(&instance->state.alt, &cfg);
 
-    LOG_I(TAG, "CRSF parser instance initialized");
+    LOG_I(TAG, "parser instance initialized");
 }
 
 // Internal vtable implementation: Initialize parser state
@@ -87,7 +87,7 @@ static void crsf_parser_internal_init(void *parser_state) {
 
     memset(state->buf, 0, sizeof(state->buf));
 
-    LOG_I(TAG, "CRSF parser state initialized");
+    LOG_I(TAG, "parser state initialized");
 }
 
 // Internal vtable implementation: Process a single byte
@@ -108,7 +108,7 @@ static void crsf_parser_internal_process_byte(void *parser_state, uint8_t byte) 
         state->buf[state->buf_pos++] = byte;
     } else {
         // Buffer overflow, reset and start over
-        LOG_W(TAG, "CRSF buffer overflow, re-syncing");
+        LOG_W(TAG, "buffer overflow, re-syncing");
         state->buf_pos = 0;
         return;
     }
@@ -143,7 +143,7 @@ static void crsf_parser_internal_process_byte(void *parser_state, uint8_t byte) 
             }
         } else {
             // !!! Reset buffer completely to find next valid frame !!!
-            LOG_W(TAG, "Failed to process CRSF frame, re-syncing parser.");
+            LOG_W(TAG, "Failed to process frame, re-syncing parser.");
             state->buf_pos = 0;
         }
     }
@@ -156,7 +156,7 @@ static void crsf_parser_internal_destroy(void *parser_state) {
 
     // Reset the state
     memset(state, 0, sizeof(crsf_state_t));
-    LOG_D(TAG, "CRSF parser state destroyed");
+    LOG_D(TAG, "parser state destroyed");
 }
 
 // Internal helper function: Process a complete CRSF frame
@@ -175,7 +175,7 @@ bool crsf_process_frame(crsf_state_t *state, const uint8_t *frame_data, size_t f
     const uint8_t received_crc = frame_data[crsf_len + 1];  // frame_data[2 + crc_payload_len]
 
     if (calculated_crc != received_crc) {
-        LOG_W(TAG, "CRSF CRC mismatch! Calculated: 0x%02X, Received: 0x%02X", calculated_crc, received_crc);
+        LOG_W(TAG, "CRC mismatch! Calculated: 0x%02X, Received: 0x%02X", calculated_crc, received_crc);
         return false;  // Drop frame if CRC does not match
     }
 
@@ -507,7 +507,7 @@ bool crsf_process_frame(crsf_state_t *state, const uint8_t *frame_data, size_t f
         }
 
         default:
-            LOG_W(TAG, "Unhandled CRSF frame ID: 0x%02X", crsf_id);
+            LOG_W(TAG, "Unhandled frame ID: 0x%02X", crsf_id);
             return false;
     }
 }

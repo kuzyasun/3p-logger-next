@@ -6,24 +6,29 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include "target.h"
-
 static sdmmc_card_t *g_card;
 
-hal_err_t sdcard_init(hal_spi_bus_t bus) {
+hal_err_t sdcard_init(hal_spi_bus_t bus, hal_gpio_t cs_pin) {
+    // SPI bus is already initialized by the main application
+    // No need to initialize it again here
+
+    // Configure SD SPI device
+    sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
+    slot_config.gpio_cs = cs_pin;
+    slot_config.host_id = bus;
+
+    // Configure SDMMC host
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
     host.slot = bus;
 
-    sdspi_slot_config_t slot_config = SDSPI_SLOT_CONFIG_DEFAULT();
-    slot_config.gpio_cs = SD_SPI_CS_GPIO;
-    slot_config.host_id = bus;
-
-    esp_vfs_fat_sdmmc_mount_config_t mount_config = {
+    // Configure mount options
+    esp_vfs_fat_mount_config_t mount_config = {
         .format_if_mount_failed = false,
         .max_files = 5,
         .allocation_unit_size = 16 * 1024,
     };
 
+    // Mount the SD card using the correct API
     esp_err_t ret = esp_vfs_fat_sdspi_mount("/", &host, &slot_config, &mount_config, &g_card);
     if (ret != ESP_OK) {
         return ret;

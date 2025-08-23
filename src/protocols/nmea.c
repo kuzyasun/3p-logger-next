@@ -37,7 +37,7 @@ void nmea_parser_init(nmea_parser_t *instance) {
     instance->state.last_frame_recv = 0;
     instance->state.gps = &gps;
 
-    LOG_I(TAG, "NMEA parser instance initialized");
+    LOG_I(TAG, "parser instance initialized");
 }
 
 // Internal vtable implementation: Initialize parser state
@@ -51,7 +51,7 @@ static void nmea_parser_internal_init(void *parser_state) {
 
     memset(state->buf, 0, sizeof(state->buf));
 
-    LOG_D(TAG, "NMEA parser state initialized");
+    LOG_D(TAG, "parser state initialized");
 }
 
 // Internal vtable implementation: Process a single byte
@@ -65,7 +65,7 @@ static void nmea_parser_internal_process_byte(void *parser_state, uint8_t byte) 
     } else {
         // Buffer overflow, reset
         state->buf_pos = 0;
-        LOG_W(TAG, "NMEA buffer overflow, resetting");
+        LOG_W(TAG, "buffer overflow, resetting");
         return;
     }
 
@@ -78,9 +78,9 @@ static void nmea_parser_internal_process_byte(void *parser_state, uint8_t byte) 
 
             // Process the complete sentence
             if (nmea_process_sentence(state, state->buf, state->buf_pos)) {
-                LOG_D(TAG, "NMEA sentence processed successfully, length: %d", state->buf_pos);
+                LOG_D(TAG, "sentence processed successfully, length: %d", state->buf_pos);
             } else {
-                LOG_W(TAG, "Failed to process NMEA sentence");
+                LOG_W(TAG, "Failed to process sentence");
             }
 
             // Reset buffer for next sentence
@@ -96,7 +96,7 @@ static void nmea_parser_internal_destroy(void *parser_state) {
 
     // Reset the state
     memset(state, 0, sizeof(nmea_state_t));
-    LOG_D(TAG, "NMEA parser state destroyed");
+    LOG_D(TAG, "parser state destroyed");
 }
 
 // Internal helper function: Process a complete NMEA sentence

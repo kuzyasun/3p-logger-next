@@ -36,7 +36,7 @@ void mavlink_parser_init(mavlink_parser_t *instance) {
     instance->state.buf_pos = 0;
     instance->state.last_frame_recv = 0;
 
-    LOG_I(TAG, "MAVLink parser instance initialized");
+    LOG_I(TAG, "parser instance initialized");
 }
 
 // Internal vtable implementation: Initialize parser state
@@ -50,7 +50,7 @@ static void mavlink_parser_internal_init(void *parser_state) {
 
     memset(state->buf, 0, sizeof(state->buf));
 
-    LOG_D(TAG, "MAVLink parser state initialized");
+    LOG_D(TAG, "parser state initialized");
 }
 
 // Internal vtable implementation: Process a single byte
@@ -64,7 +64,7 @@ static void mavlink_parser_internal_process_byte(void *parser_state, uint8_t byt
     } else {
         // Buffer overflow, reset
         state->buf_pos = 0;
-        LOG_W(TAG, "MAVLink buffer overflow, resetting");
+        LOG_W(TAG, "buffer overflow, resetting");
         return;
     }
 
@@ -89,9 +89,9 @@ static void mavlink_parser_internal_process_byte(void *parser_state, uint8_t byt
 
             // Process the complete frame
             if (mavlink_process_frame(state, state->buf, expected_frame_size)) {
-                LOG_D(TAG, "MAVLink frame processed successfully, length: %d", expected_frame_size);
+                LOG_D(TAG, "frame processed successfully, length: %d", expected_frame_size);
             } else {
-                LOG_W(TAG, "Failed to process MAVLink frame");
+                LOG_W(TAG, "Failed to process frame");
             }
 
             // Remove the processed frame from buffer
@@ -112,7 +112,7 @@ static void mavlink_parser_internal_destroy(void *parser_state) {
 
     // Reset the state
     memset(state, 0, sizeof(mavlink_state_t));
-    LOG_D(TAG, "MAVLink parser state destroyed");
+    LOG_D(TAG, "parser state destroyed");
 }
 
 // Internal helper function: Process a complete MAVLink frame
@@ -129,8 +129,7 @@ static bool mavlink_process_frame(mavlink_state_t *state, const uint8_t *frame_d
     uint8_t component_id = frame_data[4];
     uint8_t message_id = frame_data[5];
 
-    LOG_D(TAG, "MAVLink frame: start=0x%02X, len=%d, seq=%d, sys=%d, comp=%d, msg=%d", start_byte, payload_length, sequence, system_id, component_id,
-          message_id);
+    LOG_D(TAG, "frame: start=0x%02X, len=%d, seq=%d, sys=%d, comp=%d, msg=%d", start_byte, payload_length, sequence, system_id, component_id, message_id);
 
     return true;
 }

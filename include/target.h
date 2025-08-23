@@ -23,7 +23,7 @@
 #define SD_SPI_CLK_GPIO 36
 #define SD_SPI_CS_GPIO 34
 #define SD_SPI_MISO_GPIO 3
-#define SD_SPI_MOSI_GPIO 5
+#define SD_SPI_MOSI_GPIO 8
 
 #define DAC_OUT_1_GPIO 17
 #define DAC_OUT_2_GPIO 18

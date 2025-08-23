@@ -48,7 +48,7 @@ void msp_v2_parser_init(msp_v2_parser_t *instance) {
     // Ініціалізація внутрішнього стану
     memset(&instance->state, 0, sizeof(msp_v2_state_t));
 
-    LOG_I(TAG, "MSPv2 parser instance initialized");
+    LOG_I(TAG, "parser instance initialized");
 }
 
 // --- Реалізація vtable-функцій ---
@@ -57,7 +57,7 @@ static void msp_v2_parser_internal_init(void *parser_state) {
     msp_v2_state_t *state = (msp_v2_state_t *)parser_state;
     if (!state) return;
     memset(state, 0, sizeof(msp_v2_state_t));
-    LOG_D(TAG, "MSPv2 parser state reset");
+    LOG_D(TAG, "parser state reset");
 }
 
 static void msp_v2_parser_internal_destroy(void *parser_state) {
@@ -141,7 +141,7 @@ static void msp_v2_parser_internal_process_byte(void *parser_state, uint8_t byte
                 state->last_frame_recv = time_micros_now();
                 msp_v2_process_packet(state, state->cmd, state->buf, state->payload_len);
             } else {
-                LOG_W(TAG, "MSPv2 checksum mismatch! Got: 0x%02X, Calc: 0x%02X", byte, state->checksum);
+                LOG_W(TAG, "checksum mismatch! Got: 0x%02X, Calc: 0x%02X", byte, state->checksum);
             }
             state->step = 0;  // Готові до наступного пакета
             break;
@@ -184,7 +184,7 @@ static void msp_v2_process_packet(msp_v2_state_t *state, uint16_t cmd, const uin
                     app_state_set_u8(APP_STATE_FIELD_PLANE_FIX, &app_state->plane_fix, fix_type);
                     app_state_end_update();
 
-                    LOG_D(TAG, "MSPv2 GPS: Lat=%d Lon=%d Alt=%dm Sats=%d", lat, lon, alt_msl / 1000, sats);
+                    LOG_D(TAG, "GPS: Lat=%d Lon=%d Alt=%dm Sats=%d", lat, lon, alt_msl / 1000, sats);
                 }
             }
             break;
@@ -205,7 +205,7 @@ static void msp_v2_process_packet(msp_v2_state_t *state, uint16_t cmd, const uin
                 app_state_set_i16(APP_STATE_FIELD_PLANE_ROLL, &app_state->plane_roll, (int16_t)roll_deg);
                 app_state_set_i16(APP_STATE_FIELD_PLANE_PITCH, &app_state->plane_pitch, (int16_t)pitch_deg);
                 app_state_end_update();
-                LOG_D(TAG, "MSPv2 Attitude: Roll=%.1f Pitch=%.1f", roll_deg, pitch_deg);
+                LOG_D(TAG, "Attitude: Roll=%.1f Pitch=%.1f", roll_deg, pitch_deg);
             }
             break;
         }
@@ -221,13 +221,13 @@ static void msp_v2_process_packet(msp_v2_state_t *state, uint16_t cmd, const uin
                 app_state_set_u16(APP_STATE_FIELD_PLANE_BATTERY, &app_state->plane_battery, mah_drawn);
                 // Інші поля (RSSI, amps) можуть бути далі в пакеті, якщо len > 4
                 app_state_end_update();
-                LOG_D(TAG, "MSPv2 Analog: VBat=%.2fV, mAh=%u", (float)vbat_mv / 1000.0f, mah_drawn);
+                LOG_D(TAG, "Analog: VBat=%.2fV, mAh=%u", (float)vbat_mv / 1000.0f, mah_drawn);
             }
             break;
         }
 
         default:
-            LOG_D(TAG, "Unhandled MSPv2 cmd 0x%04X with len %u", cmd, len);
+            LOG_D(TAG, "Unhandled cmd 0x%04X with len %u", cmd, len);
             break;
     }
 }

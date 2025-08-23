@@ -15,7 +15,9 @@ static int32_t platform_spi_write(void *handle, uint8_t reg, const uint8_t *bufp
     uint8_t tx_buffer[len + 1];
     tx_buffer[0] = reg;
     memcpy(&tx_buffer[1], bufp, len);
-    return hal_spi_device_transmit(dev, 0, 0, tx_buffer, len + 1, NULL, 0);
+    hal_err_t result = hal_spi_device_transmit(dev, 0, 0, tx_buffer, len + 1, NULL, 0);
+    LOG_D(TAG, "SPI Write: reg=0x%02X, len=%d, result=%d", reg, len, result);
+    return result;
 }
 
 static int32_t platform_spi_read(void *handle, uint8_t reg, uint8_t *bufp, uint16_t len) {
@@ -24,7 +26,9 @@ static int32_t platform_spi_read(void *handle, uint8_t reg, uint8_t *bufp, uint1
     if (len > 1) {
         reg_with_flags |= 0x40;
     }
-    return hal_spi_device_transmit(dev, 0, 0, &reg_with_flags, 1, bufp, len);
+    hal_err_t result = hal_spi_device_transmit(dev, 0, 0, &reg_with_flags, 1, bufp, len);
+    LOG_D(TAG, "SPI Read: reg=0x%02X, len=%d, result=%d, data[0]=0x%02X", reg, len, result, bufp[0]);
+    return result;
 }
 
 static void platform_delay(uint32_t ms) { vTaskDelay(pdMS_TO_TICKS(ms)); }
@@ -71,19 +75,25 @@ hal_err_t accel_module_init(accel_module_t *module, const accel_config_t *config
         .address_bits = 0,
     };
 
+    LOG_I(TAG, "Adding SPI device: bus=%d, cs=%d, clock=%d Hz, mode=%d", module->config.spi_bus, module->config.cs_pin, spi_cfg.clock_speed_hz,
+          spi_cfg.spi_mode);
     if (hal_spi_bus_add_device(module->config.spi_bus, &spi_cfg, &module->spi_dev) != HAL_ERR_NONE) {
         LOG_E(TAG, "Failed to add SPI device");
         return HAL_ERR_FAILED;
     }
+    LOG_I(TAG, "SPI device added successfully");
 
     module->driver_ctx.write_reg = platform_spi_write;
     module->driver_ctx.read_reg = platform_spi_read;
     module->driver_ctx.mdelay = platform_delay;
     module->driver_ctx.handle = &module->spi_dev;
 
+    LOG_I(TAG, "Reading WhoAmI register...");
     uint8_t whoamI = 0;
-    if (lis3dh_device_id_get(&module->driver_ctx, &whoamI) != 0) {
-        LOG_E(TAG, "Failed to read WhoAmI register");
+    int32_t result = lis3dh_device_id_get(&module->driver_ctx, &whoamI);
+    LOG_I(TAG, "WhoAmI read result: %d, value: 0x%02X", result, whoamI);
+    if (result != 0) {
+        LOG_E(TAG, "Failed to read WhoAmI register, error: %d", result);
         return HAL_ERR_FAILED;
     }
     if (whoamI != LIS3DH_ID) {

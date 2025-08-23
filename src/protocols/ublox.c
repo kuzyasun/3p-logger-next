@@ -40,7 +40,7 @@ void ublox_parser_init(ublox_parser_t *instance) {
     instance->state.ck_a = 0;
     instance->state.ck_b = 0;
 
-    LOG_I(TAG, "UBLOX parser instance initialized");
+    LOG_I(TAG, "parser instance initialized");
 }
 
 // Internal vtable implementation: Initialize parser state
@@ -60,7 +60,7 @@ static void ublox_parser_internal_init(void *parser_state) {
 
     memset(state->buf, 0, sizeof(state->buf));
 
-    LOG_D(TAG, "UBLOX parser state initialized");
+    LOG_D(TAG, "parser state initialized");
 }
 
 // Internal vtable implementation: Process a single byte
@@ -105,7 +105,7 @@ static void ublox_parser_internal_process_byte(void *parser_state, uint8_t byte)
             state->ck_b += state->ck_a;
             state->buf_pos = 0;
             if (state->payload_length > UBLOX_BUFFER_SIZE) {
-                LOG_W(TAG, "UBLOX payload too large: %u", (unsigned)state->payload_length);
+                LOG_W(TAG, "payload too large: %u", (unsigned)state->payload_length);
                 state->step = 0;
             } else {
                 state->step = 6;
@@ -123,7 +123,7 @@ static void ublox_parser_internal_process_byte(void *parser_state, uint8_t byte)
             if (byte == state->ck_a) {
                 state->step = 8;
             } else {
-                LOG_W(TAG, "UBLOX checksum A mismatch");
+                LOG_W(TAG, "checksum A mismatch");
                 state->step = 0;
             }
             break;
@@ -133,7 +133,7 @@ static void ublox_parser_internal_process_byte(void *parser_state, uint8_t byte)
                 state->last_frame_recv = now;
                 ublox_process_frame(state, state->msg_class, state->msg_id, state->buf, state->payload_length);
             } else {
-                LOG_W(TAG, "UBLOX checksum B mismatch");
+                LOG_W(TAG, "checksum B mismatch");
             }
             state->step = 0;
             break;
@@ -150,7 +150,7 @@ static void ublox_parser_internal_destroy(void *parser_state) {
 
     // Reset the state
     memset(state, 0, sizeof(ublox_state_t));
-    LOG_D(TAG, "UBLOX parser state destroyed");
+    LOG_D(TAG, "parser state destroyed");
 }
 
 // Internal helper function: Process a complete UBLOX frame
@@ -177,11 +177,11 @@ static bool ublox_process_frame(ublox_state_t *state, uint8_t msg_class, uint8_t
         app_state_set_i16(APP_STATE_FIELD_PLANE_HEADING, &app_state->plane_heading, (int16_t)(heading / 100000));
         app_state_end_update();
 
-        LOG_D(TAG, "UBLOX NAV-PVT: Lat=%d Lon=%d Alt=%dm Speed=%dm/s Heading=%d", lat, lon, h_msl / 1000, gspeed / 1000, heading / 100000);
+        LOG_D(TAG, "NAV-PVT: Lat=%d Lon=%d Alt=%dm Speed=%dm/s Heading=%d", lat, lon, h_msl / 1000, gspeed / 1000, heading / 100000);
 
         return true;
     }
 
-    LOG_D(TAG, "UBLOX message class 0x%02X id 0x%02X not handled", msg_class, msg_id);
+    LOG_D(TAG, "message class 0x%02X id 0x%02X not handled", msg_class, msg_id);
     return false;
 }

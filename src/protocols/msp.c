@@ -31,7 +31,7 @@ void msp_parser_init(msp_parser_t *instance) {
 
     memset(&instance->state, 0, sizeof(msp_state_t));
 
-    LOG_I(TAG, "MSP parser instance initialized");
+    LOG_I(TAG, "parser instance initialized");
 }
 
 static void msp_parser_internal_init(void *parser_state) {
@@ -46,7 +46,7 @@ static void msp_parser_internal_init(void *parser_state) {
     state->last_frame_recv = 0;
     memset(state->buf, 0, sizeof(state->buf));
 
-    LOG_D(TAG, "MSP parser state initialized");
+    LOG_D(TAG, "parser state initialized");
 }
 
 static void msp_parser_internal_process_byte(void *parser_state, uint8_t byte) {
@@ -95,7 +95,7 @@ static void msp_parser_internal_process_byte(void *parser_state, uint8_t byte) {
                 state->last_frame_recv = now;
                 msp_process_packet(state, state->cmd, state->buf, state->data_len);
             } else {
-                LOG_W(TAG, "MSP checksum mismatch");
+                LOG_W(TAG, "checksum mismatch");
             }
             state->step = 0;
             break;
@@ -109,7 +109,7 @@ static void msp_parser_internal_destroy(void *parser_state) {
     msp_state_t *state = (msp_state_t *)parser_state;
     if (!state) return;
     memset(state, 0, sizeof(msp_state_t));
-    LOG_D(TAG, "MSP parser state destroyed");
+    LOG_D(TAG, "parser state destroyed");
 }
 
 static void update_flight_mode_string(app_state_t *app_state) {
@@ -153,7 +153,7 @@ static void msp_process_packet(msp_state_t *state, uint8_t cmd, const uint8_t *p
                 uint8_t version = payload[0];
                 uint8_t multitype = payload[1];
                 uint8_t msp_version = payload[2];
-                LOG_I(TAG, "MSP IDENT: FW Ver: %d.%d, Protocol Ver: %d, CopterType: %d", version / 100, (version % 100) / 10, msp_version, multitype);
+                LOG_I(TAG, "IDENT: FW Ver: %d.%d, Protocol Ver: %d, CopterType: %d", version / 100, (version % 100) / 10, msp_version, multitype);
             }
             break;
         }
@@ -175,7 +175,7 @@ static void msp_process_packet(msp_state_t *state, uint8_t cmd, const uint8_t *p
                 app_state_set_u8(APP_STATE_FIELD_PLANE_ARMED, &app_state->plane_armed, is_armed ? 1 : 0);
                 app_state_end_update();
 
-                LOG_D(TAG, "MSP STATUS: Armed: %d, CycleTime: %uus, I2C Errors: %u, Sensors: 0x%X", is_armed, cycleTime, i2cErrors, sensors);
+                LOG_D(TAG, "STATUS: Armed: %d, CycleTime: %uus, I2C Errors: %u, Sensors: 0x%X", is_armed, cycleTime, i2cErrors, sensors);
             }
             break;
         }
@@ -187,7 +187,7 @@ static void msp_process_packet(msp_state_t *state, uint8_t cmd, const uint8_t *p
                 memcpy(gyro, payload + 6, 6);
                 memcpy(mag, payload + 12, 6);
 
-                LOG_D(TAG, "MSP RAW_IMU: ACC(x,y,z)=%d,%d,%d | GYRO(x,y,z)=%d,%d,%d | MAG(x,y,z)=%d,%d,%d", acc[0], acc[1], acc[2], gyro[0], gyro[1], gyro[2],
+                LOG_D(TAG, "RAW_IMU: ACC(x,y,z)=%d,%d,%d | GYRO(x,y,z)=%d,%d,%d | MAG(x,y,z)=%d,%d,%d", acc[0], acc[1], acc[2], gyro[0], gyro[1], gyro[2],
                       mag[0], mag[1], mag[2]);
             }
             break;
@@ -197,7 +197,7 @@ static void msp_process_packet(msp_state_t *state, uint8_t cmd, const uint8_t *p
             if (len > 0 && (len % 2 == 0)) {
                 const uint8_t num_servos = len / 2;
                 uint16_t servos[16];
-                char log_str[128] = "MSP SERVOS: ";
+                char log_str[128] = "SERVOS: ";
 
                 for (int i = 0; i < num_servos && i < 16; i++) {
                     memcpy(&servos[i], payload + (i * 2), sizeof(uint16_t));
@@ -214,7 +214,7 @@ static void msp_process_packet(msp_state_t *state, uint8_t cmd, const uint8_t *p
             if (len > 0 && (len % 2 == 0)) {
                 const uint8_t num_motors = len / 2;
                 uint16_t motors[8];
-                char motor_log[128] = "MSP MOTORS: ";
+                char motor_log[128] = "MOTORS: ";
                 for (int i = 0; i < num_motors && i < 8; i++) {
                     memcpy(&motors[i], payload + (i * 2), sizeof(uint16_t));
                     char temp[10];
@@ -239,7 +239,7 @@ static void msp_process_packet(msp_state_t *state, uint8_t cmd, const uint8_t *p
                 app_state_set_u32(APP_STATE_FIELD_PLANE_RC_CHANNELS, (uint32_t *)&app_state->plane_rc_channels, 1);
                 app_state_end_update();
 
-                LOG_D(TAG, "MSP RC: CH1=%u, CH2=%u, CH3=%u, CH4=%u...", rc_channels[0], rc_channels[1], rc_channels[2], rc_channels[3]);
+                LOG_D(TAG, "RC: CH1=%u, CH2=%u, CH3=%u, CH4=%u...", rc_channels[0], rc_channels[1], rc_channels[2], rc_channels[3]);
             }
             break;
         }
@@ -268,7 +268,7 @@ static void msp_process_packet(msp_state_t *state, uint8_t cmd, const uint8_t *p
                     app_state_set_u8(APP_STATE_FIELD_PLANE_STAR, &app_state->plane_star, numsat);
                     app_state_set_u8(APP_STATE_FIELD_PLANE_FIX, &app_state->plane_fix, fix);
                     app_state_end_update();
-                    LOG_D(TAG, "MSP RAW_GPS: Lat=%d Lon=%d Alt=%dm Speed=%dcm/s Course=%ddeg", lat, lon, alt, spd, course);
+                    LOG_D(TAG, "RAW_GPS: Lat=%d Lon=%d Alt=%dm Speed=%dcm/s Course=%ddeg", lat, lon, alt, spd, course);
                 }
             }
             break;
@@ -284,7 +284,7 @@ static void msp_process_packet(msp_state_t *state, uint8_t cmd, const uint8_t *p
                 app_state_set_i16(APP_STATE_FIELD_PLANE_HOME_DIST, &app_state->plane_home_dist, dist_to_home);
                 app_state_set_i16(APP_STATE_FIELD_PLANE_HOME_DIR, &app_state->plane_home_dir, dir_to_home);
                 app_state_end_update();
-                LOG_D(TAG, "MSP COMP_GPS: DistHome=%dm, DirHome=%ddeg", dist_to_home, dir_to_home);
+                LOG_D(TAG, "COMP_GPS: DistHome=%dm, DirHome=%ddeg", dist_to_home, dir_to_home);
             }
             break;
         }
@@ -301,7 +301,7 @@ static void msp_process_packet(msp_state_t *state, uint8_t cmd, const uint8_t *p
                 app_state_set_i16(APP_STATE_FIELD_PLANE_PITCH, &app_state->plane_pitch, pitch / 10);
                 app_state_set_i16(APP_STATE_FIELD_PLANE_HEADING, &app_state->plane_heading, yaw);
                 app_state_end_update();
-                LOG_D(TAG, "MSP ATTITUDE: Roll=%.1f Pitch=%.1f Yaw=%d", (float)roll / 10.0f, (float)pitch / 10.0f, yaw);
+                LOG_D(TAG, "ATTITUDE: Roll=%.1f Pitch=%.1f Yaw=%d", (float)roll / 10.0f, (float)pitch / 10.0f, yaw);
             }
             break;
         }
@@ -317,7 +317,7 @@ static void msp_process_packet(msp_state_t *state, uint8_t cmd, const uint8_t *p
                 app_state_set_i32(APP_STATE_FIELD_PLANE_BARO_ALTITUDE, &app_state->plane_baro_altitude, alt / 100);
                 app_state_set_i16(APP_STATE_FIELD_PLANE_VSPEED, &app_state->plane_vspeed, vario);
                 app_state_end_update();
-                LOG_D(TAG, "MSP ALTITUDE: Alt=%.2fm Vario=%.2fm/s", (float)alt / 100.0f, (float)vario / 100.0f);
+                LOG_D(TAG, "ALTITUDE: Alt=%.2fm Vario=%.2fm/s", (float)alt / 100.0f, (float)vario / 100.0f);
             }
             break;
         }
@@ -338,7 +338,7 @@ static void msp_process_packet(msp_state_t *state, uint8_t cmd, const uint8_t *p
                 app_state_set_u8(APP_STATE_FIELD_PLANE_RSSI, &app_state->plane_rssi, (uint8_t)(rssi * 100 / 1023));
                 app_state_set_u16(APP_STATE_FIELD_PLANE_ESC_CURRENT, &app_state->plane_esc_current, (uint16_t)(amps * 10));
                 app_state_end_update();
-                LOG_D(TAG, "MSP ANALOG: VBat=%.1fV, mAh=%u, RSSI=%u, Amps=%.2fA", (float)vbat / 10.0f, mah_drawn, rssi, (float)amps / 100.0f);
+                LOG_D(TAG, "ANALOG: VBat=%.1fV, mAh=%u, RSSI=%u, Amps=%.2fA", (float)vbat / 10.0f, mah_drawn, rssi, (float)amps / 100.0f);
             }
             break;
         }
@@ -347,7 +347,7 @@ static void msp_process_packet(msp_state_t *state, uint8_t cmd, const uint8_t *p
             if (len > 0) {
                 memset(box_names, 0, sizeof(box_names));
                 memcpy(box_names, payload, len < sizeof(box_names) ? len : sizeof(box_names) - 1);
-                LOG_I(TAG, "MSP BOXNAMES: %s", box_names);
+                LOG_I(TAG, "BOXNAMES: %s", box_names);
             }
             break;
         }
@@ -367,13 +367,13 @@ static void msp_process_packet(msp_state_t *state, uint8_t cmd, const uint8_t *p
                 }
                 active_box_flags = flags;
                 update_flight_mode_string(app_state);
-                LOG_D(TAG, "MSP BOX: Active flags=0x%08X", active_box_flags);
+                LOG_D(TAG, "BOX: Active flags=0x%08X", active_box_flags);
             }
             break;
         }
 
         default: {
-            LOG_D(TAG, "Unhandled MSP cmd %u with len %u", cmd, len);
+            LOG_D(TAG, "Unhandled cmd %u with len %u", cmd, len);
             break;
         }
     }

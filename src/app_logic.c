@@ -207,13 +207,13 @@ esp_err_t app_logic_start_all_tasks(app_logic_t *app) {
     }
 
     // Start test mode cycle task
-    BaseType_t test_ret = xTaskCreatePinnedToCore(test_mode_cycle_task, "TEST_MODE", 4096, app, TASK_PRIORITY_DEFAULT, NULL, 0);
-    if (test_ret != pdPASS) {
-        LOG_E(TAG, "Failed to create test mode cycle task");
-        result = ESP_FAIL;
-    } else {
-        LOG_I(TAG, "Test mode cycle task created successfully");
-    }
+    // BaseType_t test_ret = xTaskCreatePinnedToCore(test_mode_cycle_task, "TEST_MODE", 4096, app, TASK_PRIORITY_DEFAULT, NULL, 0);
+    // if (test_ret != pdPASS) {
+    //     LOG_E(TAG, "Failed to create test mode cycle task");
+    //     result = ESP_FAIL;
+    // } else {
+    //     LOG_I(TAG, "Test mode cycle task created successfully");
+    // }
 
     return result;
 }

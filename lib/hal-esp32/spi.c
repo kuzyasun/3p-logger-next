@@ -1,3 +1,4 @@
+#include <driver/spi_master.h>
 #include <hal/spi.h>
 #include <string.h>
 
@@ -10,7 +11,7 @@ hal_err_t hal_spi_bus_init(hal_spi_bus_t bus, hal_gpio_t miso, hal_gpio_t mosi, 
         .quadhd_io_num = -1,
         .max_transfer_sz = 0,
     };
-    return spi_bus_initialize(bus, &cfg, 1);
+    return spi_bus_initialize(bus, &cfg, SPI_DMA_CH_AUTO);
 }
 
 hal_err_t hal_spi_bus_add_device(hal_spi_bus_t bus, const hal_spi_device_config_t *cfg, hal_spi_device_handle_t *dev) {
@@ -22,12 +23,15 @@ hal_err_t hal_spi_bus_add_device(hal_spi_bus_t bus, const hal_spi_device_config_
     devcfg.mode = cfg->spi_mode;  // mode 0-3
     devcfg.spics_io_num = cfg->cs;
     devcfg.queue_size = 4;
+    devcfg.flags = 0;             // CS active low (default behavior)
+    devcfg.duty_cycle_pos = 128;  // 50% duty cycle
+    devcfg.cs_ena_pretrans = 0;   // No CS setup time
+    devcfg.cs_ena_posttrans = 0;  // No CS hold time
     // Attach the device
     return spi_bus_add_device(bus, &devcfg, &dev->dev);
 }
 
-hal_err_t hal_spi_device_transmit(const hal_spi_device_handle_t *dev, uint16_t cmd, uint32_t addr, const void *tx, size_t tx_size, void *rx,
-                                  size_t rx_size) {
+hal_err_t hal_spi_device_transmit(const hal_spi_device_handle_t *dev, uint16_t cmd, uint32_t addr, const void *tx, size_t tx_size, void *rx, size_t rx_size) {
     // We don't use DMA enabled memory here because allocating DMA enabled
     // memory actually makes things a bit slower for the smallish payloads
     // we send (16 bytes at most right now).
@@ -59,8 +63,8 @@ hal_err_t hal_spi_device_transmit_u8(const hal_spi_device_handle_t *dev, uint16_
     return err;
 }
 
-hal_err_t hal_spi_device_transmit_bits(const hal_spi_device_handle_t *dev, uint16_t cmd, uint32_t addr, const void *tx, size_t tx_size,
-                                       void *rx, size_t rx_size) {
+hal_err_t hal_spi_device_transmit_bits(const hal_spi_device_handle_t *dev, uint16_t cmd, uint32_t addr, const void *tx, size_t tx_size, void *rx,
+                                       size_t rx_size) {
     spi_transaction_t t = {
         .cmd = cmd,
         .addr = addr,
