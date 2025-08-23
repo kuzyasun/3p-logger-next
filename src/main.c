@@ -36,7 +36,7 @@ IRAM_ATTR static void reboot_to_download_mode(void) {
     }  // на випадок, якщо компілятор спробує "піти далі"
 }
 
-// SET BOOT MODE
+// SET BOOT MODE FOR S2 LOLIN MINI
 static void usb_boot_cmd_task(void *arg) {
     vTaskDelay(pdMS_TO_TICKS(3000));
 
@@ -78,11 +78,9 @@ void app_main() {
 
     // esp_log_set_level_master(ESP_LOG_VERBOSE);
     // esp_log_level_set("*", ESP_LOG_DEBUG);
-    // esp_log_level_set("rmt", ESP_LOG_DEBUG);
 
     esp_log_set_level_master(ESP_LOG_INFO);
     esp_log_level_set("*", ESP_LOG_INFO);
-    esp_log_level_set("rmt", ESP_LOG_INFO);
 
     // Chip info
     LOG_I(TAG, "3P Logger %s", FIRMWARE_VERSION);
@@ -96,23 +94,21 @@ void app_main() {
 
     app_state_init();
 
-    io_manager_t io_manager;
-    if (io_manager_init(&io_manager) != HAL_ERR_NONE) {
-        LOG_E(TAG, "Failed to initialize IO Manager. Halting.");
-        while (1) { vTaskDelay(pdMS_TO_TICKS(1000)); }
+    app_logic_t *app_logic = malloc(sizeof(app_logic_t));
+    if (app_logic == NULL) {
+        LOG_E(TAG, "Failed to allocate memory for app_logic. Halting.");
+        while (1) {
+            vTaskDelay(portMAX_DELAY);
+        }
     }
 
-    led_module_t led_module;
-    led_module_init(&led_module);
+    app_logic_init(app_logic);
 
-    app_logic_t app_logic;
-    app_logic_init(&app_logic, &io_manager, &led_module);
-
-    if (app_logic_init_modules(&app_logic) == APP_OK) {
-        app_logic_start_all_tasks(&app_logic);
+    if (app_logic_init_modules(app_logic) == APP_OK) {
+        app_logic_start_all_tasks(app_logic);
         LOG_I(TAG, "System startup successful.");
     } else {
         LOG_E(TAG, "System startup failed. Check logs for details. Some tasks will not be started.");
-        app_logic_start_all_tasks(&app_logic);
+        app_logic_start_all_tasks(app_logic);
     }
 }

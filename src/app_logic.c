@@ -17,16 +17,66 @@
 #include "io/io_manager.h"
 #include "io/serial.h"
 #include "modules/accel_module.h"
+#include "modules/led_module.h"
 #include "modules/logger_module.h"
 #include "platform/system.h"
+#include "protocols/crsf.h"
+#include "protocols/mavlink.h"
+#include "protocols/msp.h"
+#include "protocols/msp_v2.h"
+#include "protocols/nmea.h"
+#include "protocols/ublox.h"
 
 static const char *TAG = "APPL";
 
 static QueueHandle_t g_command_queue;
 
-void app_logic_init(app_logic_t *app, io_manager_t *io_manager, led_module_t *led_module) {
-    app->io_manager = io_manager;
-    app->led_module = led_module;
+void app_logic_init(app_logic_t *app) {
+    LOG_I(TAG, "Initializing Application Logic...");
+
+    // Initialize IO Manager
+    app->io_manager = calloc(1, sizeof(io_manager_t));
+    if (app->io_manager == NULL) {
+        LOG_E(TAG, "Failed to allocate memory for IO Manager. Halting.");
+        while (1) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+    }
+
+    if (io_manager_init(app->io_manager) != HAL_ERR_NONE) {
+        LOG_E(TAG, "Failed to initialize IO Manager. Halting.");
+        while (1) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+    }
+
+    // Initialize LED Module
+    app->led_module = calloc(1, sizeof(led_module_t));
+    if (app->led_module == NULL) {
+        LOG_E(TAG, "Failed to allocate memory for LED Module. Halting.");
+        while (1) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+    }
+    led_module_init(app->led_module);
+
+    // Initialize Accelerometer Module
+    app->accel_module = calloc(1, sizeof(accel_module_t));
+    if (app->accel_module == NULL) {
+        LOG_E(TAG, "Failed to allocate memory for Accelerometer Module. Halting.");
+        while (1) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+    }
+
+    // Initialize Logger Module
+    app->logger_module = calloc(1, sizeof(logger_module_t));
+    if (app->logger_module == NULL) {
+        LOG_E(TAG, "Failed to allocate memory for Logger Module. Halting.");
+        while (1) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+    }
 
     g_command_queue = xQueueCreate(20, sizeof(app_command_t));
 
@@ -57,7 +107,7 @@ app_err_t app_logic_init_modules(app_logic_t *app) {
         .spi_bus = app->io_manager->accel_spi_bus,
         .cs_pin = ACC_SPI_CS_GPIO,
     };
-    if (accel_module_init(&app->accel_module, &accel_cfg) != HAL_ERR_NONE) {
+    if (accel_module_init(app->accel_module, &accel_cfg) != HAL_ERR_NONE) {
         LOG_E(TAG, "Failed to initialize accelerometer module. Entering error state.");
         app_state_begin_update();
         app_state_set_u8(APP_STATE_FIELD_CURRENT_MODE, (uint8_t *)&state->current_mode, APP_MODE_ERROR);
@@ -67,7 +117,7 @@ app_err_t app_logic_init_modules(app_logic_t *app) {
     }
 
     // Initialize Logger
-    if (logger_module_init(&app->logger_module, app->io_manager->sdcard_spi_bus) != HAL_ERR_NONE) {
+    if (logger_module_init(app->logger_module, app->io_manager->sdcard_spi_bus) != HAL_ERR_NONE) {
         LOG_E(TAG, "Failed to initialize logger module. Entering error state.");
         app_state_begin_update();
         app_state_set_u8(APP_STATE_FIELD_CURRENT_MODE, (uint8_t *)&state->current_mode, APP_MODE_ERROR);
@@ -200,29 +250,36 @@ esp_err_t app_logic_start_all_tasks(app_logic_t *app) {
         LOG_I(TAG, "app_logic_task created successfully");
     }
 
-    // Start io_manager_task
-    BaseType_t io_manager_ret =
-        xTaskCreatePinnedToCore(io_manager_task, "IO_MANAGER", 4096, app->io_manager, TASK_PRIORITY_DEFAULT, &app->io_manager_handle, (cpu_cores > 1) ? 1 : 0);
-    if (io_manager_ret != pdPASS) {
-        LOG_E(TAG, "Failed to create io_manager_task");
-        result = ESP_FAIL;
-    } else {
-        LOG_I(TAG, "io_manager_task created successfully");
-    }
-
     // Start LED task
-    BaseType_t led_ret = xTaskCreatePinnedToCore(led_blink_task, "LED_BLINK", 4096, app->led_module, TASK_PRIORITY_DEFAULT, &app->led_task_handle, 0);
-    if (led_ret != pdPASS) {
-        LOG_E(TAG, "Failed to create LED task");
-        result = ESP_FAIL;
+    if (app->led_module->is_initialized) {
+        BaseType_t led_ret = xTaskCreatePinnedToCore(led_blink_task, "LED_BLINK", 4096, app->led_module, TASK_PRIORITY_DEFAULT, &app->led_task_handle, 0);
+        if (led_ret != pdPASS) {
+            LOG_E(TAG, "Failed to create LED task");
+            result = ESP_FAIL;
+        } else {
+            LOG_I(TAG, "LED task created successfully");
+        }
     } else {
-        LOG_I(TAG, "LED task created successfully");
+        LOG_W(TAG, "Skipping LED task creation, module not initialized.");
     }
 
-    // Start Accel task CONDITIONALLY
-    if (app->accel_module.initialized) {
-        accel_module_create_task(&app->accel_module);
-        app->accel_task_handle = app->accel_module.task_handle;
+    // Start io_manager_task
+    if (app->io_manager->initialized) {
+        BaseType_t io_manager_ret = xTaskCreatePinnedToCore(io_manager_task, "IO_MANAGER", 4096, app->io_manager, TASK_PRIORITY_DEFAULT,
+                                                            &app->io_manager_handle, (cpu_cores > 1) ? 1 : 0);
+        if (io_manager_ret != pdPASS) {
+            LOG_E(TAG, "Failed to create io_manager_task");
+            result = ESP_FAIL;
+        } else {
+            LOG_I(TAG, "io_manager_task created successfully");
+        }
+    } else {
+        LOG_W(TAG, "Skipping io_manager_task creation, module not initialized.");
+    }
+
+    if (app->accel_module->initialized) {
+        accel_module_create_task(app->accel_module);
+        app->accel_task_handle = app->accel_module->task_handle;
         if (app->accel_task_handle == NULL) {
             LOG_E(TAG, "Failed to create accel_module_task");
             result = ESP_FAIL;
@@ -233,10 +290,9 @@ esp_err_t app_logic_start_all_tasks(app_logic_t *app) {
         LOG_W(TAG, "Skipping accel_module_task creation, module not initialized.");
     }
 
-    // Start Logger task CONDITIONALLY
-    if (app->logger_module.sd_card_ok) {
-        logger_module_create_task(&app->logger_module);
-        app->logger_task_handle = app->logger_module.task_handle;
+    if (app->logger_module->initialized && app->logger_module->sd_card_ok && app->accel_module->initialized) {
+        logger_module_create_task(app->logger_module);
+        app->logger_task_handle = app->logger_module->task_handle;
         if (app->logger_task_handle == NULL) {
             LOG_E(TAG, "Failed to create logger_task");
             result = ESP_FAIL;

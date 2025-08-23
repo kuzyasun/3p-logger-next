@@ -22,9 +22,9 @@ typedef struct logger_module_s {
     Observer *observer;
     sdcard_file_handle_t log_file;
     bool sd_card_ok;
+    bool initialized;
 } logger_module_t;
 
 // Public API
 hal_err_t logger_module_init(logger_module_t *module, hal_spi_bus_t sd_spi_bus);
 void logger_module_create_task(logger_module_t *module);
-

@@ -111,6 +111,7 @@ hal_err_t logger_module_init(logger_module_t *module, hal_spi_bus_t sd_spi_bus) 
     }
 
     LOG_I(TAG, "Logger module initialized.");
+    module->initialized = true;
     return HAL_ERR_NONE;
 }
 

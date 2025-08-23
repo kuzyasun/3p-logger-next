@@ -35,8 +35,7 @@ hal_err_t io_manager_init(io_manager_t *iom) {
     LOG_I(TAG, "Initializing SPI buses...");
 
     // Initialize SPI bus for Accelerometer
-    hal_err_t err =
-        hal_spi_bus_init(ACCEL_SPI_HOST, ACC_SPI_MISO_GPIO, ACC_SPI_MOSI_GPIO, ACC_SPI_CLK_GPIO);
+    hal_err_t err = hal_spi_bus_init(ACCEL_SPI_HOST, ACC_SPI_MISO_GPIO, ACC_SPI_MOSI_GPIO, ACC_SPI_CLK_GPIO);
     if (err != HAL_ERR_NONE) {
         LOG_E(TAG, "Failed to initialize accelerometer SPI bus");
         return err;
@@ -52,6 +51,7 @@ hal_err_t io_manager_init(io_manager_t *iom) {
     iom->sdcard_spi_bus = SDCARD_SPI_HOST;
 
     LOG_I(TAG, "IO Manager Initialized Successfully");
+    iom->initialized = true;
     return HAL_ERR_NONE;
 }
 
