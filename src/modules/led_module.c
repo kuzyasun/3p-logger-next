@@ -5,18 +5,20 @@
 
 static const char *TAG = "LED";
 
-// Task to the board LED based on app mode
+// Task to control both board LED and external LED based on app mode
 void led_blink_task(void *pvParameters) {
     led_module_t *led_module = (led_module_t *)pvParameters;
 
-    // Setup GPIO pin as output
+    // Setup both GPIO pins as output
     hal_gpio_setup(BOARDLED_PIN, HAL_GPIO_DIR_OUTPUT, HAL_GPIO_PULL_NONE);
+    hal_gpio_setup(LED_OUT_GPIO, HAL_GPIO_DIR_OUTPUT, HAL_GPIO_PULL_NONE);
 
-    LOG_I(TAG, "LED task started on pin %d", BOARDLED_PIN);
+    LOG_I(TAG, "LED task started on pins %d (onboard) and %d (external)", BOARDLED_PIN, LED_OUT_GPIO);
 
     while (1) {
-        // Turn LED on
+        // Turn both LEDs on
         hal_gpio_set_level(BOARDLED_PIN, HAL_GPIO_HIGH);
+        hal_gpio_set_level(LED_OUT_GPIO, HAL_GPIO_HIGH);
 
         // Wait time depends on current mode
         TickType_t on_delay;
@@ -43,8 +45,9 @@ void led_blink_task(void *pvParameters) {
 
         vTaskDelay(on_delay);
 
-        // Turn LED off
+        // Turn both LEDs off
         hal_gpio_set_level(BOARDLED_PIN, HAL_GPIO_LOW);
+        hal_gpio_set_level(LED_OUT_GPIO, HAL_GPIO_LOW);
 
         vTaskDelay(off_delay);
     }
