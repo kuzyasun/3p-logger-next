@@ -60,76 +60,59 @@ static inline void logger_append_crlf(logger_module_t *m) {
     logger_append_bytes(m, crlf, 2);
 }
 
-// -------------------- формування CSV-рядка --------------------
+// -------------------- реакція на зміни стану --------------------
 
-static void write_csv_line(logger_module_t *module) {
-    if (!module->sd_card_ok) return;
-
+static void on_app_state_change(Notifier *notifier, Observer *observer, void *data) {
+    logger_module_t *module = (logger_module_t *)observer->context;
     app_state_t *state = app_state_get_instance();
 
-    if (state->current_mode != APP_MODE_LOGGING) {
-        LOG_I(TAG, "Not in logging mode, skipping %d", state->current_mode);
+    if (!module->initialized || state->current_mode != APP_MODE_LOGGING) {
         return;
     }
 
-    LOG_I(TAG, "Writing CSV line");
-    char line[512];
-    int offset = 0;
+    uint64_t *changed_mask = (uint64_t *)data;
+    uint64_t trigger_mask = APP_STATE_FIELD_ACCEL_X | APP_STATE_FIELD_ACCEL_Y | APP_STATE_FIELD_ACCEL_Z | APP_STATE_FIELD_PIEZO_MASK;
 
-    uint64_t tms = (uint64_t)(esp_timer_get_time() / 1000ULL);
-    offset += snprintf(line + offset, sizeof(line) - offset, "%llu,%d,%d,%d,%u", tms, state->accel_x, state->accel_y, state->accel_z, state->piezo_mask);
+    if (!(*changed_mask & trigger_mask)) {
+        return;
+    }
+
+    log_data_snapshot_t snapshot;
+
+    snapshot.timestamp_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
+    snapshot.accel_x = state->accel_x;
+    snapshot.accel_y = state->accel_y;
+    snapshot.accel_z = state->accel_z;
+    snapshot.piezo_mask = state->piezo_mask;
 
     for (int i = 0; i < module->log_map_count; i++) {
         log_param_map_t *entry = &module->log_map[i];
         const void *ptr = ((const uint8_t *)state) + entry->offset;
 
-        if (offset >= (int)sizeof(line) - 32) break;
-
-        offset += snprintf(line + offset, sizeof(line) - offset, ",");
-
         switch (entry->type) {
             case LOG_DTYPE_INT16:
-                offset += snprintf(line + offset, sizeof(line) - offset, "%d", *(const int16_t *)ptr);
+                snapshot.telemetry_values[i].val_i16 = *(const int16_t *)ptr;
                 break;
             case LOG_DTYPE_INT32:
-                offset += snprintf(line + offset, sizeof(line) - offset, "%ld", *(const int32_t *)ptr);
+                snapshot.telemetry_values[i].val_i32 = *(const int32_t *)ptr;
                 break;
             case LOG_DTYPE_FLOAT:
-                offset += snprintf(line + offset, sizeof(line) - offset, "%.3f", *(const float *)ptr);
+                snapshot.telemetry_values[i].val_f = *(const float *)ptr;
                 break;
             default:
+                memset(&snapshot.telemetry_values[i], 0, sizeof(log_snapshot_value_u));
                 break;
         }
     }
 
-    offset += snprintf(line + offset, sizeof(line) - offset, "\r\n");
-
-    logger_append_bytes(module, (const uint8_t *)line, offset);
-
-    if (module->active_buffer_idx >= LOGGER_BUFFER_SIZE) {
-        logger_flush_active_buffer(module);
+    if (module->data_queue) {
+        xQueueSend(module->data_queue, &snapshot, 0);
     }
-}
-
-// -------------------- реакція на зміни стану --------------------
-
-static void on_app_state_change(Notifier *notifier, Observer *observer, void *data) {
-    logger_module_t *module = (logger_module_t *)observer->context;
-    uint64_t *changed_mask = (uint64_t *)data;
-
-    // Тригеримося на акселі/п’єзо — як і було задумано
-    uint64_t trigger_mask = APP_STATE_FIELD_ACCEL_X | APP_STATE_FIELD_ACCEL_Y | APP_STATE_FIELD_ACCEL_Z | APP_STATE_FIELD_PIEZO_MASK;
-
-    if (!(*changed_mask & trigger_mask)) {
-        LOG_I(TAG, "No trigger mask, skipping %llu", *changed_mask);
-        return;
-    }
-    write_csv_line(module);
 }
 
 // -------------------- задача запису на SD --------------------
 
-static void logger_task(void *arg) {
+static void logger_sd_write_task(void *arg) {
     logger_module_t *module = (logger_module_t *)arg;
 
     if (module->buffer_queue == NULL) {
@@ -147,6 +130,48 @@ static void logger_task(void *arg) {
                     LOG_E(TAG, "Failed to write log data (%d/%d)", written, (int)chunk.size);
                 }
             }
+        }
+    }
+}
+
+// -------------------- задача формування CSV --------------------
+
+static void logger_processing_task(void *arg) {
+    logger_module_t *module = (logger_module_t *)arg;
+    log_data_snapshot_t snapshot;
+
+    while (1) {
+        if (xQueueReceive(module->data_queue, &snapshot, portMAX_DELAY) == pdTRUE) {
+            char line[512];
+            int offset = 0;
+
+            offset += snprintf(line + offset, sizeof(line) - offset, "%llu,%d,%d,%d,%u", snapshot.timestamp_ms, snapshot.accel_x, snapshot.accel_y,
+                               snapshot.accel_z, snapshot.piezo_mask);
+
+            for (int i = 0; i < module->log_map_count; i++) {
+                log_param_map_t *entry = &module->log_map[i];
+
+                if (offset >= (int)sizeof(line) - 32) break;
+
+                offset += snprintf(line + offset, sizeof(line) - offset, ",");
+
+                switch (entry->type) {
+                    case LOG_DTYPE_INT16:
+                        offset += snprintf(line + offset, sizeof(line) - offset, "%d", snapshot.telemetry_values[i].val_i16);
+                        break;
+                    case LOG_DTYPE_INT32:
+                        offset += snprintf(line + offset, sizeof(line) - offset, "%ld", snapshot.telemetry_values[i].val_i32);
+                        break;
+                    case LOG_DTYPE_FLOAT:
+                        offset += snprintf(line + offset, sizeof(line) - offset, "%.3f", snapshot.telemetry_values[i].val_f);
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            offset += snprintf(line + offset, sizeof(line) - offset, "\r\n");
+            logger_append_bytes(module, (const uint8_t *)line, offset);
         }
     }
 }
@@ -280,7 +305,15 @@ hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
     sdcard_write(module->log_file, file_header, len);
     sdcard_fsync(module->log_file);
 
-    // Черга під шматки для запису
+    // Queue for data snapshots
+    module->data_queue = xQueueCreate(16, sizeof(log_data_snapshot_t));
+    if (module->data_queue == NULL) {
+        LOG_E(TAG, "Failed to create data queue. Logger disabled.");
+        module->sd_card_ok = false;
+        return HAL_ERR_FAILED;
+    }
+
+    // Queue for chunks to write to SD
     module->buffer_queue = xQueueCreate(4, sizeof(logger_chunk_t));
     if (module->buffer_queue == NULL) {
         LOG_E(TAG, "Failed to create buffer queue. Logger disabled.");
@@ -306,5 +339,6 @@ hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
 }
 
 void logger_module_create_task(logger_module_t *module) {
-    xTaskCreatePinnedToCore(logger_task, "LOGGER", 4096, module, TASK_PRIORITY_LOGGER, &module->task_handle, 0);
+    xTaskCreatePinnedToCore(logger_processing_task, "LOG_PROC", 4096, module, TASK_PRIORITY_LOGGER - 1, &module->processing_task_handle, 0);
+    xTaskCreatePinnedToCore(logger_sd_write_task, "LOG_WRITE", 4096, module, TASK_PRIORITY_LOGGER, &module->writer_task_handle, 0);
 }

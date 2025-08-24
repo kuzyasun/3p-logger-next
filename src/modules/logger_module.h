@@ -30,14 +30,31 @@ typedef struct {
     size_t size;
 } logger_chunk_t;
 
+typedef union {
+    int16_t val_i16;
+    int32_t val_i32;
+    float val_f;
+} log_snapshot_value_u;
+
+typedef struct {
+    uint64_t timestamp_ms;
+    int16_t accel_x;
+    int16_t accel_y;
+    int16_t accel_z;
+    uint8_t piezo_mask;
+    log_snapshot_value_u telemetry_values[MAX_LOG_TELEMETRY_PARAMS];
+} log_data_snapshot_t;
+
 typedef struct logger_module_s {
     uint8_t ping_buffer[LOGGER_BUFFER_SIZE];
     uint8_t pong_buffer[LOGGER_BUFFER_SIZE];
     uint8_t *active_buffer;
     volatile size_t active_buffer_idx;
 
+    QueueHandle_t data_queue;
     QueueHandle_t buffer_queue;
-    TaskHandle_t task_handle;
+    TaskHandle_t processing_task_handle;
+    TaskHandle_t writer_task_handle;
     Observer *observer;
     sdcard_file_handle_t log_file;
     char csv_header[512];
