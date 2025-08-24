@@ -19,7 +19,7 @@
 
 ## Configuation
 
-There is doc/configuration.ini  example  write it to SD card
+There is ```doc/configuration.example.ini```  example  write it to SD card with name ```configuration.ini```
 
 ## Board setup
 

@@ -9,6 +9,7 @@
 #include <sys/types.h>
 
 #include "app_state.h"
+#include "build_info.h"
 #include "log.h"
 #include "target.h"
 
@@ -257,8 +258,8 @@ hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
     }
 
     char file_header[1024];
-    int len =
-        snprintf(file_header, sizeof(file_header), "# Firmware: 1.0.0\r\n# Session Start: %s\r\n# Fields: %s\r\n", "YYYY-MM-DD HH:MM:SS", module->csv_header);
+    int len = snprintf(file_header, sizeof(file_header), "# Firmware: %s (git %s), built %s\r\n# Fields: %s\r\n", FIRMWARE_VERSION, GIT_HASH, BUILD_TIMESTAMP,
+                       module->csv_header);
     sdcard_write(module->log_file, file_header, len);
     sdcard_fsync(module->log_file);
 
