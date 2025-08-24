@@ -60,6 +60,14 @@ void app_state_set_float(app_state_field_mask_e field_mask, float *field_ptr, fl
 
 void app_state_set_bool(app_state_field_mask_e field_mask, bool *field_ptr, bool value) { SET_FIELD(bool, field_mask, field_ptr, value); }
 
+void app_state_set_error(app_err_t error_code) {
+    app_state_t *state = app_state_get_instance();
+    app_state_begin_update();
+    app_state_set_u8(APP_STATE_FIELD_CURRENT_MODE, (uint8_t *)&state->current_mode, APP_MODE_ERROR);
+    app_state_set_i32(APP_STATE_FIELD_SYSTEM_ERROR_CODE, &state->system_error_code, error_code);
+    app_state_end_update();
+}
+
 void app_state_update_rc_channels(const uint16_t new_channels[], uint8_t channel_count) {
     app_state_t *app_state = app_state_get_instance();
     uint8_t channels_to_copy = channel_count > 18 ? 18 : channel_count;

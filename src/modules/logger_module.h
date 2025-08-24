@@ -14,17 +14,25 @@ typedef struct {
     app_state_field_mask_e field_mask;
     size_t offset;
     size_t size;
+    char name[MAX_PARAM_NAME_LEN];
 } log_param_map_t;
+
+typedef struct {
+    uint8_t *data;
+    size_t size;
+} logger_chunk_t;
 
 typedef struct logger_module_s {
     uint8_t ping_buffer[LOGGER_BUFFER_SIZE];
     uint8_t pong_buffer[LOGGER_BUFFER_SIZE];
     uint8_t *active_buffer;
     volatile size_t active_buffer_idx;
+
     QueueHandle_t buffer_queue;
     TaskHandle_t task_handle;
     Observer *observer;
     sdcard_file_handle_t log_file;
+
     bool sd_card_ok;
     bool initialized;
 

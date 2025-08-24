@@ -66,31 +66,32 @@ typedef enum {
     APP_STATE_FIELD_PLANE_RF_POWER_LEVEL = (1ULL << 41),
 
     // Additional ESC telemetry (for multiple ESCs)
-    APP_STATE_FIELD_PLANE_ESC2_RPM = (1ULL << 42),
-    APP_STATE_FIELD_PLANE_ESC2_VOLTAGE = (1ULL << 43),
-    APP_STATE_FIELD_PLANE_ESC2_CURRENT = (1ULL << 44),
-    APP_STATE_FIELD_PLANE_ESC2_TEMPERATURE = (1ULL << 45),
-    APP_STATE_FIELD_PLANE_ESC3_RPM = (1ULL << 46),
-    APP_STATE_FIELD_PLANE_ESC3_VOLTAGE = (1ULL << 47),
-    APP_STATE_FIELD_PLANE_ESC3_CURRENT = (1ULL << 48),
-    APP_STATE_FIELD_PLANE_ESC3_TEMPERATURE = (1ULL << 49),
-    APP_STATE_FIELD_PLANE_ESC4_RPM = (1ULL << 50),
-    APP_STATE_FIELD_PLANE_ESC4_VOLTAGE = (1ULL << 51),
-    APP_STATE_FIELD_PLANE_ESC4_CURRENT = (1ULL << 52),
-    APP_STATE_FIELD_PLANE_ESC4_TEMPERATURE = (1ULL << 53),
+    // APP_STATE_FIELD_PLANE_ESC2_RPM = (1ULL << 42),
+    // APP_STATE_FIELD_PLANE_ESC2_VOLTAGE = (1ULL << 43),
+    // APP_STATE_FIELD_PLANE_ESC2_CURRENT = (1ULL << 44),
+    // APP_STATE_FIELD_PLANE_ESC2_TEMPERATURE = (1ULL << 45),
+    // APP_STATE_FIELD_PLANE_ESC3_RPM = (1ULL << 46),
+    // APP_STATE_FIELD_PLANE_ESC3_VOLTAGE = (1ULL << 47),
+    // APP_STATE_FIELD_PLANE_ESC3_CURRENT = (1ULL << 48),
+    // APP_STATE_FIELD_PLANE_ESC3_TEMPERATURE = (1ULL << 49),
+    // APP_STATE_FIELD_PLANE_ESC4_RPM = (1ULL << 50),
+    // APP_STATE_FIELD_PLANE_ESC4_VOLTAGE = (1ULL << 51),
+    // APP_STATE_FIELD_PLANE_ESC4_CURRENT = (1ULL << 52),
+    // APP_STATE_FIELD_PLANE_ESC4_TEMPERATURE = (1ULL << 53),
 
     // Additional time/date parameters
-    APP_STATE_FIELD_PLANE_GPS_TIME_HOURS = (1ULL << 54),
-    APP_STATE_FIELD_PLANE_GPS_TIME_MINUTES = (1ULL << 55),
-    APP_STATE_FIELD_PLANE_GPS_TIME_SECONDS = (1ULL << 56),
-    APP_STATE_FIELD_PLANE_GPS_DATE_DAY = (1ULL << 57),
-    APP_STATE_FIELD_PLANE_GPS_DATE_MONTH = (1ULL << 58),
-    APP_STATE_FIELD_PLANE_GPS_DATE_YEAR = (1ULL << 59),
-    APP_STATE_FIELD_PIEZO_MASK = (1ULL << 60),
-    APP_STATE_FIELD_CURRENT_MODE = (1ULL << 61),
-    APP_STATE_FIELD_ACCEL_X = (1ULL << 62),
-    APP_STATE_FIELD_ACCEL_Y = (1ULL << 63),
-    APP_STATE_FIELD_ACCEL_Z = (1ULL << 63),
+    APP_STATE_FIELD_PLANE_GPS_TIME_HOURS = (1ULL << 42),
+    APP_STATE_FIELD_PLANE_GPS_TIME_MINUTES = (1ULL << 43),
+    APP_STATE_FIELD_PLANE_GPS_TIME_SECONDS = (1ULL << 44),
+    APP_STATE_FIELD_PLANE_GPS_DATE_DAY = (1ULL << 45),
+    APP_STATE_FIELD_PLANE_GPS_DATE_MONTH = (1ULL << 46),
+    APP_STATE_FIELD_PLANE_GPS_DATE_YEAR = (1ULL << 47),
+    APP_STATE_FIELD_PIEZO_MASK = (1ULL << 48),
+    APP_STATE_FIELD_CURRENT_MODE = (1ULL << 49),
+    APP_STATE_FIELD_SYSTEM_ERROR_CODE = (1ULL << 50),
+    APP_STATE_FIELD_ACCEL_X = (1ULL << 51),
+    APP_STATE_FIELD_ACCEL_Y = (1ULL << 52),
+    APP_STATE_FIELD_ACCEL_Z = (1ULL << 53),
 
 } app_state_field_mask_e;
 
@@ -201,6 +202,8 @@ void app_state_set_u32(app_state_field_mask_e field_mask, uint32_t *field_ptr, u
 void app_state_set_i8(app_state_field_mask_e field_mask, int8_t *field_ptr, int8_t value);
 void app_state_set_float(app_state_field_mask_e field_mask, float *field_ptr, float value);
 void app_state_set_bool(app_state_field_mask_e field_mask, bool *field_ptr, bool value);
+
+void app_state_set_error(app_err_t error_code);
 
 void app_state_update_rc_channels(const uint16_t new_channels[], uint8_t channel_count);
 

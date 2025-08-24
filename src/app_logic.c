@@ -29,33 +29,14 @@
 #include "protocols/nmea.h"
 #include "protocols/ublox.h"
 
-static const char *TAG = "APPL";
+static const char *TAG = "APP";
 
 static QueueHandle_t g_command_queue;
 
 void app_logic_init(app_logic_t *app) {
     LOG_I(TAG, "Initializing Application Logic...");
 
-    // Initialize IO Manager first
-    app->io_manager = calloc(1, sizeof(io_manager_t));
-    if (app->io_manager == NULL) {
-        LOG_E(TAG, "Failed to allocate memory for IO Manager. Halting.");
-        while (1) {
-            vTaskDelay(pdMS_TO_TICKS(1000));
-        }
-    }
-
-    if (io_manager_init(app->io_manager) != HAL_ERR_NONE) {
-        LOG_E(TAG, "Failed to initialize IO Manager. Halting.");
-        while (1) {
-            vTaskDelay(pdMS_TO_TICKS(1000));
-        }
-    }
-
-    // Load configuration now that IO is ready
-    config_manager_load();
-
-    // Initialize LED Module
+    // Initialize LED Module to indicate status of rest modules
     app->led_module = calloc(1, sizeof(led_module_t));
     if (app->led_module == NULL) {
         LOG_E(TAG, "Failed to allocate memory for LED Module. Halting.");
@@ -64,6 +45,38 @@ void app_logic_init(app_logic_t *app) {
         }
     }
     led_module_init(app->led_module);
+    if (app->led_module->is_initialized) {
+        BaseType_t led_ret = xTaskCreatePinnedToCore(led_blink_task, "LED_BLINK", 4096, app->led_module, TASK_PRIORITY_DEFAULT, &app->led_task_handle, 0);
+        if (led_ret != pdPASS) {
+            LOG_E(TAG, "Failed to create LED task");
+            return;
+        } else {
+            LOG_I(TAG, "LED task created successfully");
+        }
+    } else {
+        LOG_W(TAG, "Skipping LED task creation, module not initialized.");
+    }
+
+    // Initialize IO Manager first
+    app->io_manager = calloc(1, sizeof(io_manager_t));
+    if (app->io_manager == NULL) {
+        LOG_E(TAG, "Failed to allocate memory for IO Manager. Halting.");
+        app_state_set_error(APP_ERR_IO_INIT_FAILED);
+        while (1) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+    }
+
+    if (io_manager_init(app->io_manager) != HAL_ERR_NONE) {
+        LOG_E(TAG, "Failed to initialize IO Manager. Halting.");
+        app_state_set_error(APP_ERR_IO_INIT_FAILED);
+        while (1) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+    }
+
+    // Load configuration now that IO is ready
+    config_manager_load();
 
     // Initialize Accelerometer Module
     app->accel_module = calloc(1, sizeof(accel_module_t));
@@ -124,10 +137,7 @@ app_err_t app_logic_init_modules(app_logic_t *app) {
     };
     if (accel_module_init(app->accel_module, &accel_cfg) != HAL_ERR_NONE) {
         LOG_E(TAG, "Failed to initialize accelerometer module. Entering error state.");
-        app_state_begin_update();
-        app_state_set_u8(APP_STATE_FIELD_CURRENT_MODE, (uint8_t *)&state->current_mode, APP_MODE_ERROR);
-        state->system_error_code = APP_ERR_ACCEL_INIT_FAILED;
-        app_state_end_update();
+        app_state_set_error(APP_ERR_ACCEL_INIT_FAILED);
         return APP_ERR_ACCEL_INIT_FAILED;
     }
 
@@ -139,10 +149,7 @@ app_err_t app_logic_init_modules(app_logic_t *app) {
     // Initialize Piezo
     if (pz_module_init(app->pz_module) != APP_OK) {
         LOG_E(TAG, "Failed to initialize piezo module. Entering error state.");
-        app_state_begin_update();
-        app_state_set_u8(APP_STATE_FIELD_CURRENT_MODE, (uint8_t *)&state->current_mode, APP_MODE_ERROR);
-        state->system_error_code = APP_ERR_GENERIC;
-        app_state_end_update();
+        app_state_set_error(APP_ERR_GENERIC);
         return APP_ERR_GENERIC;
     }
     pz_module_set_threshold(g_app_config.pz_dac1_threshold, g_app_config.pz_dac2_threshold);
@@ -269,19 +276,6 @@ esp_err_t app_logic_start_all_tasks(app_logic_t *app) {
         result = ESP_FAIL;
     } else {
         LOG_I(TAG, "app_logic_task created successfully");
-    }
-
-    // Start LED task
-    if (app->led_module->is_initialized) {
-        BaseType_t led_ret = xTaskCreatePinnedToCore(led_blink_task, "LED_BLINK", 4096, app->led_module, TASK_PRIORITY_DEFAULT, &app->led_task_handle, 0);
-        if (led_ret != pdPASS) {
-            LOG_E(TAG, "Failed to create LED task");
-            result = ESP_FAIL;
-        } else {
-            LOG_I(TAG, "LED task created successfully");
-        }
-    } else {
-        LOG_W(TAG, "Skipping LED task creation, module not initialized.");
     }
 
     // Start io_manager_task

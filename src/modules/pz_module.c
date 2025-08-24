@@ -54,6 +54,8 @@ app_err_t pz_module_init(pz_module_t *module) {
         return APP_ERR_GENERIC;
     }
 
+    gpio_install_isr_service(0);
+
     // 2. Initialize DAC channels
     dac_oneshot_config_t dac1_cfg = {
         .chan_id = DAC_CHAN_0,

@@ -21,6 +21,8 @@
 
 There is doc/configuration.ini  example  write it to SD card
 
+## Board setup
+
  to run menu config 
  ```
  pio run --target menuconfig --environment lolin_s2_mini

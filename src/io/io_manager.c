@@ -50,10 +50,11 @@ hal_err_t io_manager_init(io_manager_t *iom) {
     iom->sdcard_spi_bus = SDCARD_SPI_HOST;
 
     // Initialize SD card driver
-    err = sdcard_init(iom->sdcard_spi_bus, SD_SPI_CS_GPIO);
+    err = sdcard_init(iom->sdcard_spi_bus, SD_SPI_CS_GPIO, SD_MOUNT_PATH);
     if (err != HAL_ERR_NONE) {
         LOG_E(TAG, "Failed to initialize SD card HAL. SD card functions will be disabled.");
         iom->sd_card_ok = false;
+        return err;
     } else {
         LOG_I(TAG, "SD card initialized successfully.");
         iom->sd_card_ok = true;

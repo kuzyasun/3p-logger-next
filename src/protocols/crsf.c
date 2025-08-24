@@ -476,20 +476,20 @@ bool crsf_process_frame(crsf_state_t *state, const uint8_t *frame_data, size_t f
                     app_state_set_u16(APP_STATE_FIELD_PLANE_ESC_CURRENT, &app_state->plane_esc_current, current);
                     app_state_set_u8(APP_STATE_FIELD_PLANE_ESC_TEMPERATURE, &app_state->plane_esc_temperature, temperature);
                 } else if (esc_index == 1) {
-                    app_state_set_i32(APP_STATE_FIELD_PLANE_ESC2_RPM, &app_state->plane_esc2_rpm, state->esc_telemetry[esc_index].rpm);
-                    app_state_set_u16(APP_STATE_FIELD_PLANE_ESC2_VOLTAGE, &app_state->plane_esc2_voltage, voltage);
-                    app_state_set_u16(APP_STATE_FIELD_PLANE_ESC2_CURRENT, &app_state->plane_esc2_current, current);
-                    app_state_set_u8(APP_STATE_FIELD_PLANE_ESC2_TEMPERATURE, &app_state->plane_esc2_temperature, temperature);
+                    // app_state_set_i32(APP_STATE_FIELD_PLANE_ESC2_RPM, &app_state->plane_esc2_rpm, state->esc_telemetry[esc_index].rpm);
+                    // app_state_set_u16(APP_STATE_FIELD_PLANE_ESC2_VOLTAGE, &app_state->plane_esc2_voltage, voltage);
+                    // app_state_set_u16(APP_STATE_FIELD_PLANE_ESC2_CURRENT, &app_state->plane_esc2_current, current);
+                    // app_state_set_u8(APP_STATE_FIELD_PLANE_ESC2_TEMPERATURE, &app_state->plane_esc2_temperature, temperature);
                 } else if (esc_index == 2) {
-                    app_state_set_i32(APP_STATE_FIELD_PLANE_ESC3_RPM, &app_state->plane_esc3_rpm, state->esc_telemetry[esc_index].rpm);
-                    app_state_set_u16(APP_STATE_FIELD_PLANE_ESC3_VOLTAGE, &app_state->plane_esc3_voltage, voltage);
-                    app_state_set_u16(APP_STATE_FIELD_PLANE_ESC3_CURRENT, &app_state->plane_esc3_current, current);
-                    app_state_set_u8(APP_STATE_FIELD_PLANE_ESC3_TEMPERATURE, &app_state->plane_esc3_temperature, temperature);
+                    // app_state_set_i32(APP_STATE_FIELD_PLANE_ESC3_RPM, &app_state->plane_esc3_rpm, state->esc_telemetry[esc_index].rpm);
+                    // app_state_set_u16(APP_STATE_FIELD_PLANE_ESC3_VOLTAGE, &app_state->plane_esc3_voltage, voltage);
+                    // app_state_set_u16(APP_STATE_FIELD_PLANE_ESC3_CURRENT, &app_state->plane_esc3_current, current);
+                    // app_state_set_u8(APP_STATE_FIELD_PLANE_ESC3_TEMPERATURE, &app_state->plane_esc3_temperature, temperature);
                 } else if (esc_index == 3) {
-                    app_state_set_i32(APP_STATE_FIELD_PLANE_ESC4_RPM, &app_state->plane_esc4_rpm, state->esc_telemetry[esc_index].rpm);
-                    app_state_set_u16(APP_STATE_FIELD_PLANE_ESC4_VOLTAGE, &app_state->plane_esc4_voltage, voltage);
-                    app_state_set_u16(APP_STATE_FIELD_PLANE_ESC4_CURRENT, &app_state->plane_esc4_current, current);
-                    app_state_set_u8(APP_STATE_FIELD_PLANE_ESC4_TEMPERATURE, &app_state->plane_esc4_temperature, temperature);
+                    // app_state_set_i32(APP_STATE_FIELD_PLANE_ESC4_RPM, &app_state->plane_esc4_rpm, state->esc_telemetry[esc_index].rpm);
+                    // app_state_set_u16(APP_STATE_FIELD_PLANE_ESC4_VOLTAGE, &app_state->plane_esc4_voltage, voltage);
+                    // app_state_set_u16(APP_STATE_FIELD_PLANE_ESC4_CURRENT, &app_state->plane_esc4_current, current);
+                    // app_state_set_u8(APP_STATE_FIELD_PLANE_ESC4_TEMPERATURE, &app_state->plane_esc4_temperature, temperature);
                 }
 
                 app_state_end_update();

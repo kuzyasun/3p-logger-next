@@ -1,5 +1,6 @@
 #include "logger_module.h"
 
+#include <esp_timer.h>  // для мс timestamp
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -16,58 +17,126 @@ static const char *TAG = "LOGR";
 static hal_err_t copy_config_file(const char *dest_path);
 static void build_log_plan(logger_module_t *module);
 
+// -------------------- helpers для буферизації --------------------
+
+static inline void logger_flush_active_buffer(logger_module_t *m) {
+    if (!m->sd_card_ok || m->active_buffer_idx == 0) return;
+    logger_chunk_t chunk = {
+        .data = m->active_buffer,
+        .size = m->active_buffer_idx,
+    };
+    // Віддати заповнений пінг/понг у чергу на запис
+    xQueueSend(m->buffer_queue, &chunk, portMAX_DELAY);
+    // Перемикаємо буфер
+    m->active_buffer = (m->active_buffer == m->ping_buffer) ? m->pong_buffer : m->ping_buffer;
+    m->active_buffer_idx = 0;
+}
+
+static inline void logger_append_bytes(logger_module_t *m, const uint8_t *data, size_t len) {
+    if (!m->sd_card_ok || len == 0) return;
+    if (len > LOGGER_BUFFER_SIZE) {
+        // дуже великий шматок — пишемо порціями
+        size_t off = 0;
+        while (off < len) {
+            size_t chunk = len - off;
+            if (chunk > LOGGER_BUFFER_SIZE) chunk = LOGGER_BUFFER_SIZE;
+            memcpy(m->active_buffer, data + off, chunk);
+            m->active_buffer_idx = chunk;
+            logger_flush_active_buffer(m);
+            off += chunk;
+        }
+        return;
+    }
+    if (m->active_buffer_idx + len > LOGGER_BUFFER_SIZE) {
+        logger_flush_active_buffer(m);
+    }
+    memcpy(m->active_buffer + m->active_buffer_idx, data, len);
+    m->active_buffer_idx += len;
+}
+
+static inline void logger_append_crlf(logger_module_t *m) {
+    static const uint8_t crlf[2] = {'\r', '\n'};
+    logger_append_bytes(m, crlf, 2);
+}
+
+// -------------------- формування HEX-рядка --------------------
+
+static void write_hex_line(logger_module_t *module) {
+    if (!module->sd_card_ok) return;
+
+    app_state_t *state = app_state_get_instance();
+
+    // 1) Скласти бінарний запис у тимчасовий буфер
+    //    [u64 time_ms][i16 ax][i16 ay][i16 az][u8 piezo][...extra...]
+    uint8_t rec[128];
+    size_t rn = 0;
+
+    uint64_t tms = (uint64_t)(esp_timer_get_time() / 1000ULL);
+    memcpy(rec + rn, &tms, sizeof(tms));
+    rn += sizeof(tms);
+
+    memcpy(rec + rn, &state->accel_x, sizeof(state->accel_x));
+    rn += sizeof(state->accel_x);
+    memcpy(rec + rn, &state->accel_y, sizeof(state->accel_y));
+    rn += sizeof(state->accel_y);
+    memcpy(rec + rn, &state->accel_z, sizeof(state->accel_z));
+    rn += sizeof(state->accel_z);
+
+    memcpy(rec + rn, &state->piezo_mask, sizeof(state->piezo_mask));
+    rn += sizeof(state->piezo_mask);
+
+    // Додаткові параметри з плану (лише прості скаляри з відомими розмірами)
+    for (int i = 0; i < module->log_map_count; i++) {
+        log_param_map_t *entry = &module->log_map[i];
+        const uint8_t *ptr = ((const uint8_t *)state) + entry->offset;
+
+        if (rn + entry->size > sizeof(rec)) break;  // запобігти переповненню
+        memcpy(rec + rn, ptr, entry->size);
+        rn += entry->size;
+    }
+
+    // 2) Перетворити бінарний буфер у HEX-символи (дві літери на байт, без роздільників)
+    // Максимальна довжина рядка: rn*2 + 2 (CRLF). rn тут гарантовано <= 128.
+    char line[128 * 2 + 2];
+    static const char HEX[] = "0123456789ABCDEF";
+    size_t ln = 0;
+    for (size_t i = 0; i < rn; ++i) {
+        uint8_t b = rec[i];
+        line[ln++] = HEX[b >> 4];
+        line[ln++] = HEX[b & 0x0F];
+    }
+    // Додаємо CRLF
+    line[ln++] = '\r';
+    line[ln++] = '\n';
+
+    // 3) Додати у активний буфер
+    logger_append_bytes(module, (const uint8_t *)line, ln);
+
+    // Якщо активний буфер заповнився — злив у чергу
+    if (module->active_buffer_idx >= LOGGER_BUFFER_SIZE) {
+        logger_flush_active_buffer(module);
+    }
+}
+
+// -------------------- реакція на зміни стану --------------------
+
 static void on_app_state_change(Notifier *notifier, Observer *observer, void *data) {
     logger_module_t *module = (logger_module_t *)observer->context;
     uint64_t *changed_mask = (uint64_t *)data;
 
+    // Тригеримося на акселі/п’єзо — як і було задумано
     uint64_t trigger_mask = APP_STATE_FIELD_ACCEL_X | APP_STATE_FIELD_ACCEL_Y | APP_STATE_FIELD_ACCEL_Z | APP_STATE_FIELD_PIEZO_MASK;
+
     if (!(*changed_mask & trigger_mask)) {
         return;
     }
-    if (!module->sd_card_ok) {
-        return;
-    }
-
-    app_state_t *state = app_state_get_instance();
-    uint8_t record[module->dynamic_record_size];
-    size_t current_offset = 0;
-
-    memcpy(&record[current_offset], &state->accel_x, 2);
-    current_offset += 2;
-    memcpy(&record[current_offset], &state->accel_y, 2);
-    current_offset += 2;
-    memcpy(&record[current_offset], &state->accel_z, 2);
-    current_offset += 2;
-    memcpy(&record[current_offset], &state->piezo_mask, 1);
-    current_offset += 1;
-
-    for (int i = 0; i < module->log_map_count; i++) {
-        log_param_map_t *entry = &module->log_map[i];
-        memcpy(&record[current_offset], (uint8_t *)state + entry->offset, entry->size);
-        current_offset += entry->size;
-    }
-
-    if (module->active_buffer_idx + module->dynamic_record_size > LOGGER_BUFFER_SIZE) {
-        uint8_t *full_buffer = module->active_buffer;
-        xQueueSend(module->buffer_queue, &full_buffer, portMAX_DELAY);
-        module->active_buffer = (module->active_buffer == module->ping_buffer) ? module->pong_buffer : module->ping_buffer;
-        module->active_buffer_idx = 0;
-    }
-
-    memcpy(module->active_buffer + module->active_buffer_idx, record, module->dynamic_record_size);
-    module->active_buffer_idx += module->dynamic_record_size;
-
-    if (module->active_buffer_idx >= LOGGER_BUFFER_SIZE) {
-        uint8_t *full_buffer = module->active_buffer;
-        xQueueSend(module->buffer_queue, &full_buffer, portMAX_DELAY);
-        module->active_buffer = (module->active_buffer == module->ping_buffer) ? module->pong_buffer : module->ping_buffer;
-        module->active_buffer_idx = 0;
-    }
+    write_hex_line(module);
 }
+
+// -------------------- задача запису на SD --------------------
 
 static void logger_task(void *arg) {
     logger_module_t *module = (logger_module_t *)arg;
-    uint8_t *buffer = NULL;
 
     if (module->buffer_queue == NULL) {
         LOG_E(TAG, "Logger task started with NULL buffer queue. Task exiting.");
@@ -75,12 +144,13 @@ static void logger_task(void *arg) {
         return;
     }
 
+    logger_chunk_t chunk;
     while (1) {
-        if (xQueueReceive(module->buffer_queue, &buffer, portMAX_DELAY) == pdTRUE) {
-            if (module->sd_card_ok) {
-                int written = sdcard_write(module->log_file, buffer, LOGGER_BUFFER_SIZE);
-                if (written != LOGGER_BUFFER_SIZE) {
-                    LOG_E(TAG, "Failed to write log data");
+        if (xQueueReceive(module->buffer_queue, &chunk, portMAX_DELAY) == pdTRUE) {
+            if (module->sd_card_ok && chunk.size > 0) {
+                int written = sdcard_write(module->log_file, chunk.data, chunk.size);
+                if (written != (int)chunk.size) {
+                    LOG_E(TAG, "Failed to write log data (%d/%d)", written, (int)chunk.size);
                 }
                 sdcard_fsync(module->log_file);
             }
@@ -88,75 +158,10 @@ static void logger_task(void *arg) {
     }
 }
 
-hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
-    memset(module, 0, sizeof(logger_module_t));
-
-    module->sd_card_ok = is_sd_card_ok;
-    if (!module->sd_card_ok) {
-        LOG_E(TAG, "SD card not available. Logger disabled.");
-        return HAL_ERR_FAILED;
-    }
-
-    int log_num = 0;
-    char log_dir_path[32];
-    struct stat st;
-    while (1) {
-        sprintf(log_dir_path, "/sdcard/%d", log_num);
-        if (stat(log_dir_path, &st) != 0) {
-            break;
-        }
-        log_num++;
-    }
-
-    if (mkdir(log_dir_path, 0755) != 0) {
-        LOG_E(TAG, "Failed to create log directory %s", log_dir_path);
-        module->sd_card_ok = false;
-        return HAL_ERR_FAILED;
-    }
-
-    char config_path[64];
-    sprintf(config_path, "%s/configuration.ini", log_dir_path);
-    copy_config_file(config_path);
-
-    char log_file_path[64];
-    sprintf(log_file_path, "%s/%d.log", log_dir_path, log_num);
-    hal_err_t err = sdcard_open_file(log_file_path, "w", &module->log_file);
-    if (err != HAL_ERR_NONE) {
-        LOG_E(TAG, "Failed to create log file %s", log_file_path);
-        module->sd_card_ok = false;
-        return err;
-    }
-
-    module->buffer_queue = xQueueCreate(2, sizeof(uint8_t *));
-    if (module->buffer_queue == NULL) {
-        LOG_E(TAG, "Failed to create buffer queue. Logger disabled.");
-        module->sd_card_ok = false;
-        return HAL_ERR_FAILED;
-    }
-    module->active_buffer = module->ping_buffer;
-    module->active_buffer_idx = 0;
-
-    build_log_plan(module);
-
-    module->observer = ObserverCreate("LOGGER_APP_STATE", module, on_app_state_change, NULL);
-    if (module->observer) {
-        Notifier *app_state_notifier = app_state_get_notifier();
-        if (app_state_notifier) {
-            app_state_notifier->subject.attach(app_state_notifier, module->observer);
-        }
-    }
-
-    LOG_I(TAG, "Logger initialized. Logging to %s. Record size: %d bytes.", log_file_path, (int)module->dynamic_record_size);
-    module->initialized = true;
-    return HAL_ERR_NONE;
-}
-
-void logger_module_create_task(logger_module_t *module) {
-    xTaskCreatePinnedToCore(logger_task, "LOGGER", 4096, module, TASK_PRIORITY_DEFAULT, &module->task_handle, 0);
-}
+// -------------------- ініціалізація --------------------
 
 static hal_err_t copy_config_file(const char *dest_path) {
-    FILE *src = fopen("/sdcard/configuration.ini", "r");
+    FILE *src = fopen(SD_MOUNT_PATH "/configuration.ini", "r");
     if (!src) {
         return HAL_ERR_FAILED;
     }
@@ -178,11 +183,13 @@ static hal_err_t copy_config_file(const char *dest_path) {
 static void build_log_plan(logger_module_t *module) {
     app_state_t *state = app_state_get_instance();
     module->log_map_count = 0;
-    module->dynamic_record_size = 7;
+    module->dynamic_record_size = 0;
 
+    // Додаємо тільки підтримані імена зі списку LOG_TELEMETRY у configuration.ini
     for (int i = 0; i < g_app_config.telemetry_params_count; ++i) {
         const char *name = g_app_config.telemetry_params[i];
         log_param_map_t *entry = &module->log_map[module->log_map_count];
+
         if (strcmp(name, "plane_speed") == 0) {
             entry->field_mask = APP_STATE_FIELD_PLANE_SPEED;
             entry->offset = offsetof(app_state_t, plane_speed);
@@ -200,9 +207,85 @@ static void build_log_plan(logger_module_t *module) {
             entry->offset = offsetof(app_state_t, plane_vspeed);
             entry->size = sizeof(state->plane_vspeed);
         } else {
-            continue;
+            continue;  // інші — поки ігноруємо (щоб уникати рядків/масивів)
         }
+
+        strncpy(entry->name, name, sizeof(entry->name) - 1);
+        entry->name[sizeof(entry->name) - 1] = '\0';
+
         module->dynamic_record_size += entry->size;
         module->log_map_count++;
+        if (module->log_map_count >= MAX_LOG_TELEMETRY_PARAMS) break;
     }
+}
+
+hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
+    memset(module, 0, sizeof(logger_module_t));
+
+    module->sd_card_ok = is_sd_card_ok;
+    if (!module->sd_card_ok) {
+        LOG_E(TAG, "SD card not available. Logger disabled.");
+        return HAL_ERR_FAILED;
+    }
+
+    // Папка /N з першим вільним індексом
+    int log_num = 0;
+    char log_dir_path[32];
+    struct stat st;
+    while (1) {
+        sprintf(log_dir_path, SD_MOUNT_PATH "/%d", log_num);
+        if (stat(log_dir_path, &st) != 0) break;
+        log_num++;
+    }
+
+    if (mkdir(log_dir_path, 0755) != 0) {
+        LOG_E(TAG, "Failed to create log directory %s", log_dir_path);
+        module->sd_card_ok = false;
+        return HAL_ERR_FAILED;
+    }
+
+    // Скопіювати конфіг у лог-папку (як є)
+    char config_path[64];
+    sprintf(config_path, "%s/configuration.ini", log_dir_path);
+    copy_config_file(config_path);
+
+    // Основний лог-файл у текстовому форматі (HEX-рядки)
+    char log_file_path[64];
+    sprintf(log_file_path, "%s/%d.txt", log_dir_path, log_num);
+    hal_err_t err = sdcard_open_file(log_file_path, "w", &module->log_file);
+    if (err != HAL_ERR_NONE) {
+        LOG_E(TAG, "Failed to create log file %s", log_file_path);
+        module->sd_card_ok = false;
+        return err;
+    }
+
+    // Черга під шматки для запису
+    module->buffer_queue = xQueueCreate(4, sizeof(logger_chunk_t));
+    if (module->buffer_queue == NULL) {
+        LOG_E(TAG, "Failed to create buffer queue. Logger disabled.");
+        module->sd_card_ok = false;
+        return HAL_ERR_FAILED;
+    }
+
+    module->active_buffer = module->ping_buffer;
+    module->active_buffer_idx = 0;
+
+    build_log_plan(module);
+
+    // Підписка на зміни стану
+    module->observer = ObserverCreate("LOGGER_APP_STATE", module, on_app_state_change, NULL);
+    if (module->observer) {
+        Notifier *app_state_notifier = app_state_get_notifier();
+        if (app_state_notifier) {
+            app_state_notifier->subject.attach(app_state_notifier, module->observer);
+        }
+    }
+
+    LOG_I(TAG, "Logger initialized. HEX lines to %s", log_file_path);
+    module->initialized = true;
+    return HAL_ERR_NONE;
+}
+
+void logger_module_create_task(logger_module_t *module) {
+    xTaskCreatePinnedToCore(logger_task, "LOGGER", 4096, module, TASK_PRIORITY_DEFAULT, &module->task_handle, 0);
 }

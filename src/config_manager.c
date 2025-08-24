@@ -24,7 +24,8 @@ static void trim(char *str);
 bool config_manager_load(void) {
     set_default_config();
 
-    FILE *f = fopen("/sdcard/configuration.ini", "r");
+    LOG_I(TAG, "Loading configuration from %s", SD_MOUNT_PATH "/configuration.ini");
+    FILE *f = fopen(SD_MOUNT_PATH "/configuration.ini", "r");
     if (!f) {
         LOG_W(TAG, "configuration.ini not found, using defaults");
         return false;

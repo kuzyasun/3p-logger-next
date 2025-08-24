@@ -8,7 +8,7 @@
 
 static sdmmc_card_t *g_card;
 
-hal_err_t sdcard_init(hal_spi_bus_t bus, hal_gpio_t cs_pin) {
+hal_err_t sdcard_init(hal_spi_bus_t bus, hal_gpio_t cs_pin, const char *mount_path) {
     // SPI bus is already initialized by the main application
     // No need to initialize it again here
 
@@ -29,8 +29,10 @@ hal_err_t sdcard_init(hal_spi_bus_t bus, hal_gpio_t cs_pin) {
     };
 
     // Mount the SD card using the correct API
-    esp_err_t ret = esp_vfs_fat_sdspi_mount("/", &host, &slot_config, &mount_config, &g_card);
+    esp_err_t ret = esp_vfs_fat_sdspi_mount(mount_path, &host, &slot_config, &mount_config, &g_card);
     if (ret != ESP_OK) {
+        const char *error_msg = esp_err_to_name(ret);
+        ESP_LOGE("SDCARD", "Failed to mount SD card: %s (0x%x)", error_msg, ret);
         return ret;
     }
     return HAL_ERR_NONE;
@@ -51,8 +53,8 @@ hal_err_t sdcard_fsync(sdcard_file_handle_t handle) { return fsync(fileno((FILE 
 
 hal_err_t sdcard_close_file(sdcard_file_handle_t handle) { return fclose((FILE *)handle) == 0 ? HAL_ERR_NONE : HAL_ERR_FAILED; }
 
-hal_err_t sdcard_deinit(void) {
-    esp_vfs_fat_sdcard_unmount("/", g_card);
+hal_err_t sdcard_deinit(const char *mount_path) {
+    esp_vfs_fat_sdcard_unmount(mount_path, g_card);
     g_card = NULL;
     return HAL_ERR_NONE;
 }
