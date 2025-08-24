@@ -67,6 +67,15 @@ static int32_t platform_spi_read(void *handle, uint8_t reg, uint8_t *bufp, uint1
 
 static void platform_delay(uint32_t ms) { vTaskDelay(pdMS_TO_TICKS(ms)); }
 
+static void IRAM_ATTR accel_isr_handler(void *arg) {
+    accel_module_t *module = (accel_module_t *)arg;
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    vTaskNotifyGiveFromISR(module->task_handle, &xHigherPriorityTaskWoken);
+    if (xHigherPriorityTaskWoken) {
+        portYIELD_FROM_ISR();
+    }
+}
+
 // --- Module Task ---
 static void accel_module_task(void *arg) {
     accel_module_t *module = (accel_module_t *)arg;
@@ -74,21 +83,17 @@ static void accel_module_task(void *arg) {
     int16_t raw_accel[3];
 
     while (1) {
-        uint8_t data_ready = 0;
-        lis3dh_xl_data_ready_get(&module->driver_ctx, &data_ready);
-
-        if (data_ready) {
-            if (lis3dh_acceleration_raw_get(&module->driver_ctx, raw_accel) == 0) {
-                app_state_begin_update();
-                app_state_set_i16(APP_STATE_FIELD_ACCEL_X, &state->accel_x, raw_accel[0]);
-                app_state_set_i16(APP_STATE_FIELD_ACCEL_Y, &state->accel_y, raw_accel[1]);
-                app_state_set_i16(APP_STATE_FIELD_ACCEL_Z, &state->accel_z, raw_accel[2]);
-                app_state_end_update();
-                LOG_D(TAG, "Accel Raw X:%d Y:%d Z:%d", raw_accel[0], raw_accel[1], raw_accel[2]);
-            }
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        if (lis3dh_acceleration_raw_get(&module->driver_ctx, raw_accel) == 0) {
+            app_state_begin_update();
+            app_state_set_i16(APP_STATE_FIELD_ACCEL_X, &state->accel_x, raw_accel[0]);
+            app_state_set_i16(APP_STATE_FIELD_ACCEL_Y, &state->accel_y, raw_accel[1]);
+            app_state_set_i16(APP_STATE_FIELD_ACCEL_Z, &state->accel_z, raw_accel[2]);
+            app_state_end_update();
+            LOG_D(TAG, "Accel (INT): X:%d Y:%d Z:%d", raw_accel[0], raw_accel[1], raw_accel[2]);
+        } else {
+            LOG_W(TAG, "Interrupt received, but failed to read acceleration data.");
         }
-
-        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -144,6 +149,28 @@ hal_err_t accel_module_init(accel_module_t *module, const accel_config_t *config
     lis3dh_full_scale_set(&module->driver_ctx, module->config.full_scale);
     lis3dh_data_rate_set(&module->driver_ctx, module->config.output_data_rate);
     lis3dh_block_data_update_set(&module->driver_ctx, PROPERTY_ENABLE);
+
+    // --- Configure LIS3DH to generate data-ready interrupt on INT1 pin ---
+    lis3dh_ctrl_reg3_t int1_cfg = {0};
+    int1_cfg.i1_zyxda = 1;
+    if (lis3dh_pin_int1_config_set(&module->driver_ctx, &int1_cfg) != 0) {
+        LOG_E(TAG, "Failed to configure data-ready interrupt on LIS3DH sensor");
+        return HAL_ERR_FAILED;
+    }
+    LOG_I(TAG, "LIS3DH INT1 pin configured for data-ready signal.");
+
+    // --- Configure ESP32 GPIO to receive the interrupt ---
+    hal_gpio_config_t io_conf;
+    io_conf.pin = ACC_INT_GPIO;
+    io_conf.mode = HAL_GPIO_MODE_INPUT;
+    io_conf.pull_up_en = false;
+    io_conf.pull_down_en = true;
+    io_conf.intr_type = HAL_GPIO_INTR_POSEDGE;
+    hal_gpio_config(&io_conf);
+
+    hal_gpio_install_isr_service(0);
+    hal_gpio_isr_handler_add(ACC_INT_GPIO, accel_isr_handler, (void *)module);
+    LOG_I(TAG, "GPIO interrupt handler installed for ACC_INT_GPIO.");
 
     LOG_I(TAG, "LIS3DH initialized successfully.");
     module->initialized = true;

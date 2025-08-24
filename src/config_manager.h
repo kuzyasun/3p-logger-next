@@ -15,7 +15,6 @@ typedef struct {
     lis3dh_fs_t full_scale;
     lis3dh_op_md_t op_mode;
     bool bdu_enabled;
-    bool data_ready_interrupt_enabled;
     hal_spi_bus_t spi_bus;
     hal_gpio_t cs_pin;
 } extended_accel_config_t;
