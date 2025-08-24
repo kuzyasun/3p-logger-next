@@ -21,10 +21,10 @@ static void IRAM_ATTR pz_gpio_isr_handler(void *arg) {
     uint8_t mask = 0;
 
     // Read the state of all 4 comparator pins
-    if (gpio_get_level(COMP_1_OUT_GPIO)) mask |= (1 << 0);
-    if (gpio_get_level(COMP_2_OUT_GPIO)) mask |= (1 << 1);
-    if (gpio_get_level(COMP_3_OUT_GPIO)) mask |= (1 << 2);
-    if (gpio_get_level(COMP_4_OUT_GPIO)) mask |= (1 << 3);
+    if (hal_gpio_get_level(COMP_1_OUT_GPIO)) mask |= (1 << 0);
+    if (hal_gpio_get_level(COMP_2_OUT_GPIO)) mask |= (1 << 1);
+    if (hal_gpio_get_level(COMP_3_OUT_GPIO)) mask |= (1 << 2);
+    if (hal_gpio_get_level(COMP_4_OUT_GPIO)) mask |= (1 << 3);
 
     // If any comparator triggered, send the mask to the queue
     if (mask > 0) {
@@ -53,8 +53,6 @@ app_err_t pz_module_init(pz_module_t *module) {
         LOG_E(TAG, "Failed to create event queue");
         return APP_ERR_GENERIC;
     }
-
-    gpio_install_isr_service(0);
 
     // 2. Initialize DAC channels
     dac_oneshot_config_t dac1_cfg = {
