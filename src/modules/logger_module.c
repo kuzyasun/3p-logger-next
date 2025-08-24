@@ -70,12 +70,7 @@ static void write_csv_line(logger_module_t *module) {
     int offset = 0;
 
     uint64_t tms = (uint64_t)(esp_timer_get_time() / 1000ULL);
-    offset += snprintf(line + offset, sizeof(line) - offset, "%llu,%d,%d,%d,%u",
-                       tms,
-                       state->accel_x,
-                       state->accel_y,
-                       state->accel_z,
-                       state->piezo_mask);
+    offset += snprintf(line + offset, sizeof(line) - offset, "%llu,%d,%d,%d,%u", tms, state->accel_x, state->accel_y, state->accel_z, state->piezo_mask);
 
     for (int i = 0; i < module->log_map_count; i++) {
         log_param_map_t *entry = &module->log_map[i];
@@ -90,7 +85,7 @@ static void write_csv_line(logger_module_t *module) {
                 offset += snprintf(line + offset, sizeof(line) - offset, "%d", *(const int16_t *)ptr);
                 break;
             case LOG_DTYPE_INT32:
-                offset += snprintf(line + offset, sizeof(line) - offset, "%d", *(const int32_t *)ptr);
+                offset += snprintf(line + offset, sizeof(line) - offset, "%ld", *(const int32_t *)ptr);
                 break;
             case LOG_DTYPE_FLOAT:
                 offset += snprintf(line + offset, sizeof(line) - offset, "%.3f", *(const float *)ptr);
@@ -262,10 +257,8 @@ hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
     }
 
     char file_header[1024];
-    int len = snprintf(file_header, sizeof(file_header),
-                       "# Firmware: 1.0.0\r\n# Session Start: %s\r\n# Fields: %s\r\n",
-                       "YYYY-MM-DD HH:MM:SS",
-                       module->csv_header);
+    int len =
+        snprintf(file_header, sizeof(file_header), "# Firmware: 1.0.0\r\n# Session Start: %s\r\n# Fields: %s\r\n", "YYYY-MM-DD HH:MM:SS", module->csv_header);
     sdcard_write(module->log_file, file_header, len);
     sdcard_fsync(module->log_file);
 

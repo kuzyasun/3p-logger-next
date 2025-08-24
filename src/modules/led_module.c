@@ -1,6 +1,7 @@
 #include "led_module.h"
 
 #include "app_state.h"
+#include "driver/gpio.h"
 #include "util/observer.h"
 
 static const char *TAG = "LED";
@@ -10,8 +11,13 @@ void led_blink_task(void *pvParameters) {
     led_module_t *led_module = (led_module_t *)pvParameters;
 
     // Setup both GPIO pins as output
+    // GPIO 40 connected to JTAG so we need to reset it before use
+    gpio_reset_pin(LED_OUT_GPIO);
+
     hal_gpio_setup(BOARDLED_PIN, HAL_GPIO_DIR_OUTPUT, HAL_GPIO_PULL_NONE);
     hal_gpio_setup(LED_OUT_GPIO, HAL_GPIO_DIR_OUTPUT, HAL_GPIO_PULL_NONE);
+    hal_gpio_set_level(LED_OUT_GPIO, HAL_GPIO_HIGH);
+    hal_gpio_set_level(BOARDLED_PIN, HAL_GPIO_HIGH);
 
     LOG_I(TAG, "LED task started on pins %d (onboard) and %d (external)", BOARDLED_PIN, LED_OUT_GPIO);
 

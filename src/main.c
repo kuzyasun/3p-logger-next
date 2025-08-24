@@ -12,6 +12,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "hal/gpio.h"
+#include "hal/init.h"
 #include "io/io_manager.h"
 #include "platform/system.h"
 #include "soc/rtc_cntl_reg.h"
@@ -75,6 +76,7 @@ void app_main() {
     usb_boot_cmd_start();
 
     vTaskDelay(1000 / portTICK_PERIOD_MS);
+    hal_platform_init();
 
     // esp_log_set_level_master(ESP_LOG_VERBOSE);
     // esp_log_level_set("*", ESP_LOG_DEBUG);

@@ -1,3 +1,3 @@
 #pragma once
 
-void hal_init(void);
+void hal_platform_init(void);
