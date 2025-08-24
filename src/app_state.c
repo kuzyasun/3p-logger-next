@@ -5,6 +5,10 @@
 #include <string.h>
 #include <target.h>
 
+#include "log.h"
+
+static const char *TAG = "STATE";
+
 static app_state_t g_app_state;
 
 void app_state_init(void) {

@@ -93,7 +93,7 @@ static void accel_module_task(void *arg) {
             app_state_set_i16(APP_STATE_FIELD_ACCEL_Y, &state->accel_y, raw_accel[1]);
             app_state_set_i16(APP_STATE_FIELD_ACCEL_Z, &state->accel_z, raw_accel[2]);
             app_state_end_update();
-            LOG_I(TAG, "Accel (INT): X:%d Y:%d Z:%d", raw_accel[0], raw_accel[1], raw_accel[2]);
+            // LOG_I(TAG, "Accel (INT): X:%d Y:%d Z:%d", raw_accel[0], raw_accel[1], raw_accel[2]);
         } else {
             LOG_W(TAG, "Interrupt received, but failed to read acceleration data.");
         }
@@ -191,7 +191,7 @@ hal_err_t accel_module_init(accel_module_t *module, const accel_config_t *config
     LOG_I(TAG, "LIS3DH Configuration Summary:");
     LOG_I(TAG, "  - Operating Mode: %d", module->config.op_mode);
     LOG_I(TAG, "  - Full Scale: %d", module->config.full_scale);
-    LOG_I(TAG, "  - Output Data Rate: %d", LIS3DH_ODR_100Hz);  // module->config.output_data_rate);
+    LOG_I(TAG, "  - Output Data Rate: %d", module->config.output_data_rate);  // LIS3DH_ODR_100Hz);  //
     LOG_I(TAG, "  - Block Data Update: ENABLED");
     LOG_I(TAG, "  - SPI Bus: %d", module->config.spi_bus);
     LOG_I(TAG, "  - CS Pin: %d", module->config.cs_pin);

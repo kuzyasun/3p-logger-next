@@ -8,7 +8,7 @@
 #include "hal/sdcard.h"
 #include "util/observer.h"
 
-#define LOGGER_BUFFER_SIZE 4096
+#define LOGGER_BUFFER_SIZE 8192
 
 typedef enum {
     LOG_DTYPE_UNKNOWN,
@@ -37,7 +37,7 @@ typedef union {
 } log_snapshot_value_u;
 
 typedef struct {
-    uint64_t timestamp_ms;
+    uint64_t timestamp_us;
     int16_t accel_x;
     int16_t accel_y;
     int16_t accel_z;
@@ -65,6 +65,7 @@ typedef struct logger_module_s {
     size_t dynamic_record_size;
     log_param_map_t log_map[MAX_LOG_TELEMETRY_PARAMS];
     int log_map_count;
+    u_int64_t dropped_chunks;
 } logger_module_t;
 
 hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok);

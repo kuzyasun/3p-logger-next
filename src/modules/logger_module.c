@@ -1,6 +1,7 @@
 #include "logger_module.h"
 
-#include <esp_timer.h>  // для мс timestamp
+#include <esp_system.h>
+#include <esp_timer.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -26,9 +27,14 @@ static inline void logger_flush_active_buffer(logger_module_t *m) {
         .data = m->active_buffer,
         .size = m->active_buffer_idx,
     };
-    // Віддати заповнений пінг/понг у чергу на запис
-    xQueueSend(m->buffer_queue, &chunk, portMAX_DELAY);
-    // Перемикаємо буфер
+
+    if (xQueueSend(m->buffer_queue, &chunk, pdMS_TO_TICKS(10)) != pdTRUE) {
+        // drop: черга забита -> не блокуємось
+        ++m->dropped_chunks;
+    }
+
+    // xQueueSend(m->buffer_queue, &chunk, portMAX_DELAY);
+
     m->active_buffer = (m->active_buffer == m->ping_buffer) ? m->pong_buffer : m->ping_buffer;
     m->active_buffer_idx = 0;
 }
@@ -66,7 +72,6 @@ static void on_app_state_change(Notifier *notifier, Observer *observer, void *da
     logger_module_t *module = (logger_module_t *)observer->context;
     app_state_t *state = app_state_get_instance();
 
-    LOG_I(TAG, "Trigger OK");
     if (!module->initialized || state->current_mode != APP_MODE_LOGGING) {
         LOG_I(TAG, "Not initialized or not in logging mode");
         return;
@@ -82,7 +87,7 @@ static void on_app_state_change(Notifier *notifier, Observer *observer, void *da
 
     log_data_snapshot_t snapshot;
 
-    snapshot.timestamp_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
+    snapshot.timestamp_us = esp_timer_get_time();
     snapshot.accel_x = state->accel_x;
     snapshot.accel_y = state->accel_y;
     snapshot.accel_z = state->accel_z;
@@ -125,13 +130,17 @@ static void logger_sd_write_task(void *arg) {
     }
 
     logger_chunk_t chunk;
-    while (1) {
-        if (xQueueReceive(module->buffer_queue, &chunk, portMAX_DELAY) == pdTRUE) {
-            if (module->sd_card_ok && chunk.size > 0) {
-                int written = sdcard_write(module->log_file, chunk.data, chunk.size);
-                if (written != (int)chunk.size) {
-                    LOG_E(TAG, "Failed to write log data (%d/%d)", written, (int)chunk.size);
-                }
+    int chunks_since_sync = 0;
+    while (xQueueReceive(module->buffer_queue, &chunk, portMAX_DELAY) == pdTRUE) {
+        if (module->sd_card_ok && chunk.size > 0) {
+            int written = sdcard_write(module->log_file, chunk.data, chunk.size);
+            if (written != (int)chunk.size) LOG_E(TAG, "Write fail %d/%d", written, (int)chunk.size);
+            if (++chunks_since_sync >= 8) {
+                LOG_I(TAG, "Sync %d", chunks_since_sync);
+                fflush((FILE *)module->log_file);
+                sdcard_fsync(module->log_file);
+                chunks_since_sync = 0;
+                vTaskDelay(1);  // yield
             }
         }
     }
@@ -148,7 +157,7 @@ static void logger_processing_task(void *arg) {
             char line[512];
             int offset = 0;
 
-            offset += snprintf(line + offset, sizeof(line) - offset, "%llu,%d,%d,%d,%u", snapshot.timestamp_ms, snapshot.accel_x, snapshot.accel_y,
+            offset += snprintf(line + offset, sizeof(line) - offset, "%llu,%d,%d,%d,%u", snapshot.timestamp_us, snapshot.accel_x, snapshot.accel_y,
                                snapshot.accel_z, snapshot.piezo_mask);
 
             for (int i = 0; i < module->log_map_count; i++) {
@@ -209,7 +218,7 @@ static void build_log_plan(logger_module_t *module) {
     int offset = 0;
     size_t header_buf_size = sizeof(module->csv_header);
 
-    offset += snprintf(module->csv_header + offset, header_buf_size - offset, "timestamp_ms,accel_x,accel_y,accel_z,piezo_mask");
+    offset += snprintf(module->csv_header + offset, header_buf_size - offset, "timestamp_us,accel_x,accel_y,accel_z,piezo_mask");
 
     for (int i = 0; i < g_app_config.telemetry_params_count; ++i) {
         if (module->log_map_count >= MAX_LOG_TELEMETRY_PARAMS) {
@@ -302,12 +311,20 @@ hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
         return err;
     }
 
+    setvbuf((FILE *)module->log_file, NULL, _IONBF, 0);
+
     char file_header[1024];
     int len = snprintf(file_header, sizeof(file_header), "# Firmware: %s (git %s), built %s\r\n# Fields: %s\r\n", FIRMWARE_VERSION, GIT_HASH, BUILD_TIMESTAMP,
                        module->csv_header);
     int written = sdcard_write(module->log_file, file_header, len);
     if (written != len) {
         LOG_E(TAG, "HEADER WRITE FAILED! Tried to write %d bytes, but wrote %d.", len, written);
+        module->sd_card_ok = false;
+        return HAL_ERR_FAILED;
+    }
+
+    if (fflush((FILE *)module->log_file) != 0) {
+        LOG_E(TAG, "HEADER fflush failed");
         module->sd_card_ok = false;
         return HAL_ERR_FAILED;
     }
@@ -328,7 +345,7 @@ hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
     }
 
     // Queue for chunks to write to SD
-    module->buffer_queue = xQueueCreate(4, sizeof(logger_chunk_t));
+    module->buffer_queue = xQueueCreate(1, sizeof(logger_chunk_t));
     if (module->buffer_queue == NULL) {
         LOG_E(TAG, "Failed to create buffer queue. Logger disabled.");
         module->sd_card_ok = false;
