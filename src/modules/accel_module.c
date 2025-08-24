@@ -1,5 +1,6 @@
 #include "accel_module.h"
 
+#include <driver/spi_master.h>
 #include <string.h>
 
 #include "app_state.h"
@@ -12,6 +13,9 @@ static const char *TAG = "ACCEL";
 // --- Platform-specific functions to connect driver to HAL ---
 static int32_t platform_spi_write(void *handle, uint8_t reg, const uint8_t *bufp, uint16_t len) {
     hal_spi_device_handle_t *dev = (hal_spi_device_handle_t *)handle;
+    // For writing we cannot use the `cmd` field because the ESP-IDF driver
+    // sends it before the data without holding CS.
+    // So we form a buffer where the first byte is the register address.
     uint8_t tx_buffer[len + 1];
     tx_buffer[0] = reg;
     memcpy(&tx_buffer[1], bufp, len);
@@ -22,12 +26,42 @@ static int32_t platform_spi_write(void *handle, uint8_t reg, const uint8_t *bufp
 
 static int32_t platform_spi_read(void *handle, uint8_t reg, uint8_t *bufp, uint16_t len) {
     hal_spi_device_handle_t *dev = (hal_spi_device_handle_t *)handle;
-    uint8_t reg_with_flags = reg | 0x80;
-    if (len > 1) {
-        reg_with_flags |= 0x40;
+
+    if (len == 0) {
+        return 0;  // Nothing to read
     }
-    hal_err_t result = hal_spi_device_transmit(dev, 0, 0, &reg_with_flags, 1, bufp, len);
-    LOG_D(TAG, "SPI Read: reg=0x%02X, len=%d, result=%d, data[0]=0x%02X", reg, len, result, bufp[0]);
+
+    // SPI transaction for LIS3DH requires sending address, then reading data.
+    // This means we need to send len + 1 bytes and receive len + 1 bytes.
+    // The first received byte will be garbage.
+
+    // Maximum buffer size that might be needed
+    uint8_t tx_buffer[len + 1];
+    uint8_t rx_buffer[len + 1];
+
+    // 1. Form the first byte (command)
+    tx_buffer[0] = reg | 0x80;  // Read flag
+    if (len > 1) {
+        tx_buffer[0] |= 0x40;  // Flag for auto-increment for multiple byte reads
+    }
+
+    // The rest of the buffer for transmission can be zeros (dummy bytes)
+    memset(&tx_buffer[1], 0, len);
+
+    // 2. Perform one transaction that sends the command and dummy bytes,
+    //    and simultaneously reads the garbage and useful data.
+    hal_err_t result = hal_spi_device_transmit(dev, 0, 0, tx_buffer, len + 1, rx_buffer, len + 1);
+
+    if (result != HAL_ERR_NONE) {
+        LOG_E(TAG, "hal_spi_device_transmit failed with error %d", result);
+        return result;
+    }
+
+    // 3. Copy useful data (skipping the first garbage byte) to the output buffer.
+    memcpy(bufp, &rx_buffer[1], len);
+
+    LOG_D(TAG, "SPI Read: reg=0x%02X -> OK, data[0]=0x%02X", reg, bufp[0]);
+
     return result;
 }
 
@@ -89,6 +123,7 @@ hal_err_t accel_module_init(accel_module_t *module, const accel_config_t *config
     module->driver_ctx.handle = &module->spi_dev;
 
     LOG_I(TAG, "Reading WhoAmI register...");
+
     uint8_t whoamI = 0;
     int32_t result = lis3dh_device_id_get(&module->driver_ctx, &whoamI);
     LOG_I(TAG, "WhoAmI read result: %d, value: 0x%02X", result, whoamI);
