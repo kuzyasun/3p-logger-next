@@ -287,17 +287,17 @@ esp_err_t app_logic_start_all_tasks(app_logic_t *app) {
         LOG_W(TAG, "Skipping accel_module_task creation, module not initialized.");
     }
 
-    if (app->logger_module->initialized && app->logger_module->sd_card_ok && app->accel_module->initialized) {
+    if (app->logger_module->initialized && app->logger_module->sd_card_ok) {
         logger_module_create_task(app->logger_module);
-        app->logger_task_handle = app->logger_module->task_handle;
+        app->logger_task_handle = app->logger_module->writer_task_handle;
         if (app->logger_task_handle == NULL) {
-            LOG_E(TAG, "Failed to create logger_task");
+            LOG_E(TAG, "Failed to create logger tasks");
             result = ESP_FAIL;
         } else {
-            LOG_I(TAG, "logger_task created successfully");
+            LOG_I(TAG, "Logger tasks created successfully");
         }
     } else {
-        LOG_W(TAG, "Skipping logger_task creation, module not initialized.");
+        LOG_W(TAG, "Skipping logger task creation, module not initialized or SD card issue.");
     }
 
     if (app->pz_module->is_initialized) {
