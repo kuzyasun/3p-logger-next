@@ -333,7 +333,7 @@ bool crsf_process_frame(crsf_state_t *state, const uint8_t *frame_data, size_t f
 
             app_state_t *app_state = app_state_get_instance();
             app_state_begin_update();
-            app_state_set_i32(APP_STATE_FIELD_PLANE_BARO_ALTITUDE, &app_state->plane_baro_altitude, (int32_t)baro_alt_raw);
+            app_state_set_i16(APP_STATE_FIELD_PLANE_BARO_ALTITUDE, &app_state->plane_baro_altitude, (int16_t)baro_alt_raw);
             app_state_set_i32(APP_STATE_FIELD_PLANE_FUSED_ALTITUDE, &app_state->plane_fused_altitude, (int32_t)lroundf(fused));
             app_state_end_update();
 

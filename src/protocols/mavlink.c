@@ -156,7 +156,7 @@ static bool mavlink_process_frame(mavlink_state_t *state, const uint8_t *frame_d
             app_state_set_i32(APP_STATE_FIELD_PLANE_LATITUDE, &app_state->plane_latitude, pos.lat);
             app_state_set_i32(APP_STATE_FIELD_PLANE_LONGITUDE, &app_state->plane_longitude, pos.lon);
             app_state_set_i32(APP_STATE_FIELD_PLANE_ALTITUDE, &app_state->plane_altitude, pos.alt / 1000);                     // в метри
-            app_state_set_i32(APP_STATE_FIELD_PLANE_BARO_ALTITUDE, &app_state->plane_baro_altitude, pos.relative_alt / 1000);  // в метри
+            app_state_set_i16(APP_STATE_FIELD_PLANE_BARO_ALTITUDE, &app_state->plane_baro_altitude, (int16_t)(pos.relative_alt / 1000));  // в метри
             app_state_set_i16(APP_STATE_FIELD_PLANE_SPEED, &app_state->plane_speed, (int16_t)(ground_speed_mps * 100));        // в см/с
             app_state_set_i16(APP_STATE_FIELD_PLANE_HEADING, &app_state->plane_heading, pos.hdg / 100);                        // в градуси
             app_state_end_update();
