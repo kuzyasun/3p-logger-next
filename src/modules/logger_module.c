@@ -67,6 +67,10 @@ static void write_csv_line(logger_module_t *module) {
 
     app_state_t *state = app_state_get_instance();
 
+    if (state->current_mode != APP_MODE_LOGGING) {
+        return;
+    }
+
     char line[512];
     int offset = 0;
 
@@ -139,7 +143,6 @@ static void logger_task(void *arg) {
                 if (written != (int)chunk.size) {
                     LOG_E(TAG, "Failed to write log data (%d/%d)", written, (int)chunk.size);
                 }
-                sdcard_fsync(module->log_file);
             }
         }
     }
