@@ -13,7 +13,7 @@ extern "C" {
 typedef void *sdcard_file_handle_t;
 
 // Public API
-hal_err_t sdcard_init(hal_spi_bus_t bus, hal_gpio_t cs_pin, const char *mount_path);
+hal_err_t sdcard_init(hal_spi_bus_t bus, hal_gpio_t cs_pin, const char *mount_path, bool format_if_mount_failed);
 hal_err_t sdcard_open_file(const char *path, const char *mode, sdcard_file_handle_t *handle);
 int sdcard_write(sdcard_file_handle_t handle, const void *data, size_t size);
 hal_err_t sdcard_fsync(sdcard_file_handle_t handle);

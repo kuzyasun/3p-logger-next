@@ -66,7 +66,9 @@ static void on_app_state_change(Notifier *notifier, Observer *observer, void *da
     logger_module_t *module = (logger_module_t *)observer->context;
     app_state_t *state = app_state_get_instance();
 
+    LOG_I(TAG, "Trigger OK");
     if (!module->initialized || state->current_mode != APP_MODE_LOGGING) {
+        LOG_I(TAG, "Not initialized or not in logging mode");
         return;
     }
 
@@ -74,6 +76,7 @@ static void on_app_state_change(Notifier *notifier, Observer *observer, void *da
     uint64_t trigger_mask = APP_STATE_FIELD_ACCEL_X | APP_STATE_FIELD_ACCEL_Y | APP_STATE_FIELD_ACCEL_Z | APP_STATE_FIELD_PIEZO_MASK;
 
     if (!(*changed_mask & trigger_mask)) {
+        LOG_W(TAG, "No trigger");
         return;
     }
 
@@ -292,7 +295,7 @@ hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
     // Main log file in CSV format
     char log_file_path[64];
     sprintf(log_file_path, "%s/data_%d.csv", log_dir_path, log_num);
-    hal_err_t err = sdcard_open_file(log_file_path, "w", &module->log_file);
+    hal_err_t err = sdcard_open_file(log_file_path, "a", &module->log_file);
     if (err != HAL_ERR_NONE) {
         LOG_E(TAG, "Failed to create log file %s", log_file_path);
         module->sd_card_ok = false;
@@ -302,8 +305,19 @@ hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
     char file_header[1024];
     int len = snprintf(file_header, sizeof(file_header), "# Firmware: %s (git %s), built %s\r\n# Fields: %s\r\n", FIRMWARE_VERSION, GIT_HASH, BUILD_TIMESTAMP,
                        module->csv_header);
-    sdcard_write(module->log_file, file_header, len);
-    sdcard_fsync(module->log_file);
+    int written = sdcard_write(module->log_file, file_header, len);
+    if (written != len) {
+        LOG_E(TAG, "HEADER WRITE FAILED! Tried to write %d bytes, but wrote %d.", len, written);
+        module->sd_card_ok = false;
+        return HAL_ERR_FAILED;
+    }
+
+    hal_err_t sync_status = sdcard_fsync(module->log_file);
+    if (sync_status != HAL_ERR_NONE) {
+        LOG_E(TAG, "HEADER FSYNC FAILED! Error code: %d", sync_status);
+        module->sd_card_ok = false;
+        return HAL_ERR_FAILED;
+    }
 
     // Queue for data snapshots
     module->data_queue = xQueueCreate(16, sizeof(log_data_snapshot_t));
@@ -339,6 +353,18 @@ hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
 }
 
 void logger_module_create_task(logger_module_t *module) {
-    xTaskCreatePinnedToCore(logger_processing_task, "LOG_PROC", 4096, module, TASK_PRIORITY_LOGGER - 1, &module->processing_task_handle, 0);
-    xTaskCreatePinnedToCore(logger_sd_write_task, "LOG_WRITE", 4096, module, TASK_PRIORITY_LOGGER, &module->writer_task_handle, 0);
+    BaseType_t status1 =
+        xTaskCreatePinnedToCore(logger_processing_task, "LOG_PROC", 4096, module, TASK_PRIORITY_LOGGER - 1, &module->processing_task_handle, 0);
+    if (status1 != pdPASS) {
+        LOG_E(TAG, "Failed to create LOG_PROC task!");
+        return;
+    }
+
+    BaseType_t status2 = xTaskCreatePinnedToCore(logger_sd_write_task, "LOG_WRITE", 4096, module, TASK_PRIORITY_LOGGER, &module->writer_task_handle, 0);
+    if (status2 != pdPASS) {
+        LOG_E(TAG, "Failed to create LOG_WRITE task!");
+        return;
+    }
+
+    LOG_I(TAG, "Logger tasks created successfully.");
 }

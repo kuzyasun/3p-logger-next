@@ -11,11 +11,11 @@
 
 // Include all parser headers
 #include "protocols/crsf.h"
+#include "protocols/mavlink.h"
 #include "protocols/msp.h"
 #include "protocols/msp_v2.h"
 #include "protocols/nmea.h"
 #include "protocols/ublox.h"
-#include "protocols/mavlink.h"
 
 static const char *TAG = "IOM";
 
@@ -57,7 +57,7 @@ hal_err_t io_manager_init(io_manager_t *iom) {
     iom->sdcard_spi_bus = SDCARD_SPI_HOST;
 
     // Initialize SD card driver
-    err = sdcard_init(iom->sdcard_spi_bus, SD_SPI_CS_GPIO, SD_MOUNT_PATH);
+    err = sdcard_init(iom->sdcard_spi_bus, SD_SPI_CS_GPIO, SD_MOUNT_PATH, true);
     if (err != HAL_ERR_NONE) {
         LOG_E(TAG, "Failed to initialize SD card HAL. SD card functions will be disabled.");
         iom->sd_card_ok = false;

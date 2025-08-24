@@ -125,7 +125,7 @@ void app_logic_init(app_logic_t *app) {
         }
     } else {
         LOG_I(TAG, "Application Logic Initialized successfully.");
-
+        vTaskDelay(pdMS_TO_TICKS(1000));
         app_logic_send_command(app, APP_CMD_SET_MODE_LOGGING);
     }
 }

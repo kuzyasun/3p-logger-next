@@ -8,7 +8,7 @@
 
 static sdmmc_card_t *g_card;
 
-hal_err_t sdcard_init(hal_spi_bus_t bus, hal_gpio_t cs_pin, const char *mount_path) {
+hal_err_t sdcard_init(hal_spi_bus_t bus, hal_gpio_t cs_pin, const char *mount_path, bool format_if_mount_failed) {
     // SPI bus is already initialized by the main application
     // No need to initialize it again here
 
@@ -23,7 +23,7 @@ hal_err_t sdcard_init(hal_spi_bus_t bus, hal_gpio_t cs_pin, const char *mount_pa
 
     // Configure mount options
     esp_vfs_fat_mount_config_t mount_config = {
-        .format_if_mount_failed = false,
+        .format_if_mount_failed = format_if_mount_failed,
         .max_files = 5,
         .allocation_unit_size = 16 * 1024,
     };

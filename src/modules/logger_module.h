@@ -8,7 +8,7 @@
 #include "hal/sdcard.h"
 #include "util/observer.h"
 
-#define LOGGER_BUFFER_SIZE 8192
+#define LOGGER_BUFFER_SIZE 4096
 
 typedef enum {
     LOG_DTYPE_UNKNOWN,
@@ -57,7 +57,7 @@ typedef struct logger_module_s {
     TaskHandle_t writer_task_handle;
     Observer *observer;
     sdcard_file_handle_t log_file;
-    char csv_header[512];
+    char csv_header[1024];
 
     bool sd_card_ok;
     bool initialized;
