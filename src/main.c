@@ -1,3 +1,4 @@
+#include <driver/gpio.h>
 #include <log.h>
 #include <target.h>
 #include <version.h>
@@ -76,7 +77,8 @@ void app_main() {
     usb_boot_cmd_start();
 
     vTaskDelay(1000 / portTICK_PERIOD_MS);
-    hal_platform_init();
+    // hal_platform_init();
+    ESP_ERROR_CHECK(gpio_install_isr_service(ESP_INTR_FLAG_IRAM));
 
     // esp_log_set_level_master(ESP_LOG_VERBOSE);
     // esp_log_level_set("*", ESP_LOG_DEBUG);

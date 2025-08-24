@@ -26,9 +26,13 @@
 static const char *TAG = "APP";
 
 static QueueHandle_t g_command_queue;
+static app_logic_t *g_app_logic_instance = NULL;
 
 void app_logic_init(app_logic_t *app) {
     LOG_I(TAG, "Initializing Application Logic...");
+
+    // Store the global instance
+    g_app_logic_instance = app;
 
     // Initialize LED Module to indicate status of rest modules
     app->led_module = calloc(1, sizeof(led_module_t));
@@ -76,6 +80,7 @@ void app_logic_init(app_logic_t *app) {
     app->accel_module = calloc(1, sizeof(accel_module_t));
     if (app->accel_module == NULL) {
         LOG_E(TAG, "Failed to allocate memory for Accelerometer Module. Halting.");
+        app_state_set_error(APP_ERR_MEMORY_ALLOCATION_FAILED);
         while (1) {
             vTaskDelay(pdMS_TO_TICKS(1000));
         }
@@ -85,6 +90,7 @@ void app_logic_init(app_logic_t *app) {
     app->logger_module = calloc(1, sizeof(logger_module_t));
     if (app->logger_module == NULL) {
         LOG_E(TAG, "Failed to allocate memory for Logger Module. Halting.");
+        app_state_set_error(APP_ERR_MEMORY_ALLOCATION_FAILED);
         while (1) {
             vTaskDelay(pdMS_TO_TICKS(1000));
         }
@@ -94,6 +100,7 @@ void app_logic_init(app_logic_t *app) {
     app->pz_module = calloc(1, sizeof(pz_module_t));
     if (app->pz_module == NULL) {
         LOG_E(TAG, "Failed to allocate memory for Piezo Module. Halting.");
+        app_state_set_error(APP_ERR_MEMORY_ALLOCATION_FAILED);
         while (1) {
             vTaskDelay(pdMS_TO_TICKS(1000));
         }
@@ -111,7 +118,16 @@ void app_logic_init(app_logic_t *app) {
         LOG_I(TAG, "UART1 is disabled in configuration.");
     }
 
-    LOG_I(TAG, "Application Logic Initialized.");
+    if (app_state_get_instance()->system_error_code != APP_OK) {
+        LOG_E(TAG, "Application Logic Initialization failed. Halting.");
+        while (1) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+    } else {
+        LOG_I(TAG, "Application Logic Initialized successfully.");
+
+        app_logic_send_command(app, APP_CMD_SET_MODE_LOGGING);
+    }
 }
 
 app_err_t app_logic_init_modules(app_logic_t *app) {
@@ -225,31 +241,6 @@ static app_err_t _app_logic_handle_command(app_logic_t *app, app_command_t *cmd)
     return result;
 }
 
-// Test task to cycle through modes for demonstration
-static void test_mode_cycle_task(void *pvParameters) {
-    app_logic_t *app = (app_logic_t *)pvParameters;
-
-    LOG_I(TAG, "Test mode cycle task started");
-
-    // Wait a bit for system to stabilize
-    vTaskDelay(pdMS_TO_TICKS(2000));
-
-    while (1) {
-        // Cycle through modes: IDLE -> LOGGING -> ERROR -> IDLE
-        LOG_I(TAG, "Setting mode to IDLE");
-        app_logic_send_command(app, APP_CMD_SET_MODE_IDLE);
-        vTaskDelay(pdMS_TO_TICKS(5000));  // 5 seconds in IDLE
-
-        LOG_I(TAG, "Setting mode to LOGGING");
-        app_logic_send_command(app, APP_CMD_SET_MODE_LOGGING);
-        vTaskDelay(pdMS_TO_TICKS(5000));  // 5 seconds in LOGGING
-
-        LOG_I(TAG, "Setting mode to ERROR");
-        app_logic_send_command(app, APP_CMD_SET_MODE_ERROR);
-        vTaskDelay(pdMS_TO_TICKS(5000));  // 5 seconds in ERROR
-    }
-}
-
 // ============================================================================
 // Task Management Functions
 // ============================================================================
@@ -322,15 +313,6 @@ esp_err_t app_logic_start_all_tasks(app_logic_t *app) {
         LOG_W(TAG, "Skipping pz_module_task creation, module not initialized.");
     }
 
-    // Start test mode cycle task
-    // BaseType_t test_ret = xTaskCreatePinnedToCore(test_mode_cycle_task, "TEST_MODE", 4096, app, TASK_PRIORITY_DEFAULT, NULL, 0);
-    // if (test_ret != pdPASS) {
-    //     LOG_E(TAG, "Failed to create test mode cycle task");
-    //     result = ESP_FAIL;
-    // } else {
-    //     LOG_I(TAG, "Test mode cycle task created successfully");
-    // }
-
     return result;
 }
 
@@ -348,3 +330,5 @@ esp_err_t app_logic_send_command(app_logic_t *app, app_command_id_e cmd_id) {
 
     return ESP_OK;
 }
+
+app_logic_t *get_global_app_logic_instance(void) { return g_app_logic_instance; }

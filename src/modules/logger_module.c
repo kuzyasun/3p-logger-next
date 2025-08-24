@@ -68,9 +68,11 @@ static void write_csv_line(logger_module_t *module) {
     app_state_t *state = app_state_get_instance();
 
     if (state->current_mode != APP_MODE_LOGGING) {
+        LOG_I(TAG, "Not in logging mode, skipping %d", state->current_mode);
         return;
     }
 
+    LOG_I(TAG, "Writing CSV line");
     char line[512];
     int offset = 0;
 
@@ -119,6 +121,7 @@ static void on_app_state_change(Notifier *notifier, Observer *observer, void *da
     uint64_t trigger_mask = APP_STATE_FIELD_ACCEL_X | APP_STATE_FIELD_ACCEL_Y | APP_STATE_FIELD_ACCEL_Z | APP_STATE_FIELD_PIEZO_MASK;
 
     if (!(*changed_mask & trigger_mask)) {
+        LOG_I(TAG, "No trigger mask, skipping %llu", *changed_mask);
         return;
     }
     write_csv_line(module);
@@ -175,9 +178,22 @@ static void build_log_plan(logger_module_t *module) {
     module->log_map_count = 0;
     module->dynamic_record_size = 0;
 
-    strcpy(module->csv_header, "timestamp_ms,accel_x,accel_y,accel_z,piezo_mask");
+    int offset = 0;
+    size_t header_buf_size = sizeof(module->csv_header);
+
+    offset += snprintf(module->csv_header + offset, header_buf_size - offset, "timestamp_ms,accel_x,accel_y,accel_z,piezo_mask");
 
     for (int i = 0; i < g_app_config.telemetry_params_count; ++i) {
+        if (module->log_map_count >= MAX_LOG_TELEMETRY_PARAMS) {
+            LOG_W(TAG, "Reached max log telemetry params limit (%d).", MAX_LOG_TELEMETRY_PARAMS);
+            break;
+        }
+
+        if (offset >= (int)header_buf_size - 32) {
+            LOG_W(TAG, "CSV header buffer is full, some telemetry fields may be skipped.");
+            break;
+        }
+
         const char *name = g_app_config.telemetry_params[i];
         log_param_map_t *entry = &module->log_map[module->log_map_count];
         entry->type = LOG_DTYPE_UNKNOWN;
@@ -209,12 +225,10 @@ static void build_log_plan(logger_module_t *module) {
         strncpy(entry->name, name, sizeof(entry->name) - 1);
         entry->name[sizeof(entry->name) - 1] = '\0';
 
-        strcat(module->csv_header, ",");
-        strcat(module->csv_header, name);
+        offset += snprintf(module->csv_header + offset, header_buf_size - offset, ",%s", name);
 
         module->dynamic_record_size += entry->size;
         module->log_map_count++;
-        if (module->log_map_count >= MAX_LOG_TELEMETRY_PARAMS) break;
     }
 }
 

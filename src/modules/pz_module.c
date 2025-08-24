@@ -39,6 +39,8 @@ static void pz_module_task(void *arg) {
     while (1) {
         // Block and wait for a mask from the ISR
         if (xQueueReceive(pz_events_queue, &received_mask, portMAX_DELAY) == pdTRUE) {
+            LOG_I(TAG, "Piezo event received: mask=0x%02X bits=[%d%d%d%d]", received_mask, (received_mask >> 3) & 1, (received_mask >> 2) & 1,
+                  (received_mask >> 1) & 1, received_mask & 1);
             app_state_begin_update();
             app_state_set_u8(APP_STATE_FIELD_PIEZO_MASK, &state->piezo_mask, received_mask);
             app_state_end_update();

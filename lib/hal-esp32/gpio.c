@@ -12,6 +12,9 @@ static dac_oneshot_handle_t dac_channel_1_handle = NULL;
 static dac_oneshot_handle_t dac_channel_2_handle = NULL;
 #endif
 
+// Global array to store the last configured interrupt type for each GPIO
+static gpio_int_type_t gpio_intr_types[GPIO_NUM_MAX] = {GPIO_INTR_DISABLE};
+
 static hal_err_t hal_gpio_enable(hal_gpio_t gpio) {
     hal_err_t err;
 #if defined(CONFIG_IDF_TARGET_ESP32)
@@ -157,6 +160,8 @@ hal_err_t hal_gpio_set_isr(hal_gpio_t gpio, hal_gpio_intr_t intr, hal_gpio_isr_t
                 intr_type = GPIO_INTR_HIGH_LEVEL;
                 break;
         }
+        // Store the interrupt type for later enable/disable operations
+        gpio_intr_types[gpio] = intr_type;
         if ((err = gpio_set_intr_type(gpio, intr_type)) != HAL_ERR_NONE) {
             return err;
         }
@@ -164,6 +169,7 @@ hal_err_t hal_gpio_set_isr(hal_gpio_t gpio, hal_gpio_intr_t intr, hal_gpio_isr_t
             return err;
         }
     } else {
+        gpio_intr_types[gpio] = GPIO_INTR_DISABLE;
         if ((err = gpio_set_intr_type(gpio, GPIO_INTR_DISABLE)) != HAL_ERR_NONE) {
             return err;
         }
@@ -173,6 +179,16 @@ hal_err_t hal_gpio_set_isr(hal_gpio_t gpio, hal_gpio_intr_t intr, hal_gpio_isr_t
     }
 
     return HAL_ERR_NONE;
+}
+
+hal_err_t hal_gpio_intr_enable(hal_gpio_t gpio) {
+    // Re-enable interrupts by setting the interrupt type back to the last configured type
+    return gpio_set_intr_type(gpio, gpio_intr_types[gpio]);
+}
+
+hal_err_t hal_gpio_intr_disable(hal_gpio_t gpio) {
+    // Disable interrupts by setting the interrupt type to disable
+    return gpio_set_intr_type(gpio, GPIO_INTR_DISABLE);
 }
 
 char *hal_gpio_toa(hal_gpio_t gpio, char *dst, size_t size) {

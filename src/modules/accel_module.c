@@ -70,27 +70,30 @@ static void platform_delay(uint32_t ms) { vTaskDelay(pdMS_TO_TICKS(ms)); }
 static void IRAM_ATTR accel_isr_handler(void *arg) {
     accel_module_t *module = (accel_module_t *)arg;
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    vTaskNotifyGiveFromISR(module->task_handle, &xHigherPriorityTaskWoken);
-    if (xHigherPriorityTaskWoken) {
-        portYIELD_FROM_ISR();
+    if (module->task_handle) {
+        vTaskNotifyGiveFromISR(module->task_handle, &xHigherPriorityTaskWoken);
+        if (xHigherPriorityTaskWoken) {
+            portYIELD_FROM_ISR();
+        }
     }
 }
 
 // --- Module Task ---
 static void accel_module_task(void *arg) {
     accel_module_t *module = (accel_module_t *)arg;
-    app_state_t *state = app_state_get_instance();
+
     int16_t raw_accel[3];
 
     while (1) {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         if (lis3dh_acceleration_raw_get(&module->driver_ctx, raw_accel) == 0) {
-            app_state_begin_update();
-            app_state_set_i16(APP_STATE_FIELD_ACCEL_X, &state->accel_x, raw_accel[0]);
-            app_state_set_i16(APP_STATE_FIELD_ACCEL_Y, &state->accel_y, raw_accel[1]);
-            app_state_set_i16(APP_STATE_FIELD_ACCEL_Z, &state->accel_z, raw_accel[2]);
-            app_state_end_update();
-            LOG_D(TAG, "Accel (INT): X:%d Y:%d Z:%d", raw_accel[0], raw_accel[1], raw_accel[2]);
+            // app_state_t *state = app_state_get_instance();
+            // app_state_begin_update();
+            // app_state_set_i16(APP_STATE_FIELD_ACCEL_X, &state->accel_x, raw_accel[0]);
+            // app_state_set_i16(APP_STATE_FIELD_ACCEL_Y, &state->accel_y, raw_accel[1]);
+            // app_state_set_i16(APP_STATE_FIELD_ACCEL_Z, &state->accel_z, raw_accel[2]);
+            // app_state_end_update();
+            LOG_I(TAG, "Accel (INT): X:%d Y:%d Z:%d", raw_accel[0], raw_accel[1], raw_accel[2]);
         } else {
             LOG_W(TAG, "Interrupt received, but failed to read acceleration data.");
         }
@@ -130,7 +133,8 @@ hal_err_t accel_module_init(accel_module_t *module, const accel_config_t *config
     LOG_I(TAG, "Reading WhoAmI register...");
 
     uint8_t whoamI = 0;
-    int32_t result = lis3dh_device_id_get(&module->driver_ctx, &whoamI);
+    int32_t result;
+    result = lis3dh_device_id_get(&module->driver_ctx, &whoamI);
     LOG_I(TAG, "WhoAmI read result: %d, value: 0x%02X", result, whoamI);
     if (result != 0) {
         LOG_E(TAG, "Failed to read WhoAmI register, error: %d", result);
@@ -145,10 +149,52 @@ hal_err_t accel_module_init(accel_module_t *module, const accel_config_t *config
     lis3dh_boot_set(&module->driver_ctx, PROPERTY_ENABLE);
     platform_delay(10);
 
-    lis3dh_operating_mode_set(&module->driver_ctx, module->config.op_mode);
-    lis3dh_full_scale_set(&module->driver_ctx, module->config.full_scale);
-    lis3dh_data_rate_set(&module->driver_ctx, module->config.output_data_rate);
-    lis3dh_block_data_update_set(&module->driver_ctx, PROPERTY_ENABLE);
+    result = lis3dh_operating_mode_set(&module->driver_ctx, module->config.op_mode);
+    if (result != 0) {
+        LOG_E(TAG, "Failed to set operating mode, error: %d", result);
+        return HAL_ERR_FAILED;
+    }
+
+    result = lis3dh_full_scale_set(&module->driver_ctx, module->config.full_scale);
+    if (result != 0) {
+        LOG_E(TAG, "Failed to set full scale, error: %d", result);
+        return HAL_ERR_FAILED;
+    }
+
+    result = lis3dh_data_rate_set(&module->driver_ctx, module->config.output_data_rate);
+    if (result != 0) {
+        LOG_E(TAG, "Failed to set data rate, error: %d", result);
+        return HAL_ERR_FAILED;
+    }
+
+    result = lis3dh_block_data_update_set(&module->driver_ctx, PROPERTY_ENABLE);
+    if (result != 0) {
+        LOG_E(TAG, "Failed to set block data update, error: %d", result);
+        return HAL_ERR_FAILED;
+    }
+
+    lis3dh_ctrl_reg1_t ctrl_reg1;
+    if (lis3dh_read_reg(&module->driver_ctx, LIS3DH_CTRL_REG1, (uint8_t *)&ctrl_reg1, 1) != 0) {
+        LOG_E(TAG, "Failed to read CTRL_REG1 before enabling axes");
+        return HAL_ERR_FAILED;
+    }
+    ctrl_reg1.xen = 1;
+    ctrl_reg1.yen = 1;
+    ctrl_reg1.zen = 1;
+    if (lis3dh_write_reg(&module->driver_ctx, LIS3DH_CTRL_REG1, (uint8_t *)&ctrl_reg1, 1) != 0) {
+        LOG_E(TAG, "Failed to write CTRL_REG1 to enable axes");
+        return HAL_ERR_FAILED;
+    }
+    LOG_I(TAG, "X, Y, Z axes enabled.");
+
+    // Log all configured parameters
+    LOG_I(TAG, "LIS3DH Configuration Summary:");
+    LOG_I(TAG, "  - Operating Mode: %d", module->config.op_mode);
+    LOG_I(TAG, "  - Full Scale: %d", module->config.full_scale);
+    LOG_I(TAG, "  - Output Data Rate: %d", LIS3DH_ODR_100Hz);  // module->config.output_data_rate);
+    LOG_I(TAG, "  - Block Data Update: ENABLED");
+    LOG_I(TAG, "  - SPI Bus: %d", module->config.spi_bus);
+    LOG_I(TAG, "  - CS Pin: %d", module->config.cs_pin);
 
     // --- Configure LIS3DH to generate data-ready interrupt on INT1 pin ---
     lis3dh_ctrl_reg3_t int1_cfg = {0};
@@ -160,8 +206,10 @@ hal_err_t accel_module_init(accel_module_t *module, const accel_config_t *config
     LOG_I(TAG, "LIS3DH INT1 pin configured for data-ready signal.");
 
     // --- Configure GPIO to receive the interrupt using HAL ---
-    hal_gpio_setup(ACC_INT_GPIO, HAL_GPIO_DIR_INPUT, HAL_GPIO_PULL_DOWN);
+    hal_gpio_setup(ACC_INT_GPIO, HAL_GPIO_DIR_INPUT, HAL_GPIO_PULL_UP);
     hal_gpio_set_isr(ACC_INT_GPIO, HAL_GPIO_INTR_POSEDGE, accel_isr_handler, (void *)module);
+    // temporary disable interrupt untill task started
+    // hal_gpio_intr_disable(ACC_INT_GPIO);
     LOG_I(TAG, "GPIO interrupt handler installed for ACC_INT_GPIO.");
 
     LOG_I(TAG, "LIS3DH initialized successfully.");
@@ -171,7 +219,15 @@ hal_err_t accel_module_init(accel_module_t *module, const accel_config_t *config
 
 void accel_module_create_task(accel_module_t *module) {
     if (!module) {
+        LOG_E(TAG, "Module is NULL");
         return;
     }
+
     xTaskCreatePinnedToCore(accel_module_task, "ACCEL_TASK", 4096, module, TASK_PRIORITY_ACCEL_TASK, &module->task_handle, 0);
+
+    if (module->task_handle && hal_gpio_get_level(ACC_INT_GPIO)) {
+        xTaskNotifyGive(module->task_handle);
+    }
+
+    // hal_gpio_intr_enable(ACC_INT_GPIO);
 }

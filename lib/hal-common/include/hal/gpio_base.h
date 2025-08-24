@@ -53,6 +53,10 @@ hal_err_t hal_gpio_get_level(hal_gpio_t gpio);
 typedef void (*hal_gpio_isr_t)(void *);
 int hal_gpio_set_isr(hal_gpio_t gpio, hal_gpio_intr_t intr, hal_gpio_isr_t isr, const void *data);
 
+// Enable/disable GPIO interrupts
+hal_err_t hal_gpio_intr_enable(hal_gpio_t gpio);
+hal_err_t hal_gpio_intr_disable(hal_gpio_t gpio);
+
 char *hal_gpio_toa(hal_gpio_t gpio, char *dst, size_t size);
 
 // Cleanup function for platform-specific resources
