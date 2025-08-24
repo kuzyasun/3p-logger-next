@@ -13,7 +13,7 @@
 #define COMP_4_OUT_GPIO 6
 
 #define UART1_RX_GPIO 13
-#define UART1_TX_GPIO 21
+#define UART2_RX_GPIO 21  // not implemented,  should be programatic UART because S2 mini has only 2 uarts (0, 1)
 
 #define ACC_INT_GPIO 5
 #define ACC_SPI_CLK_GPIO 7
@@ -33,9 +33,11 @@
 #define DAC_OUT_2_GPIO 18
 
 // Task Priority Definitions
-typedef enum {
-    TASK_PRIORITY_IDLE = 0,         // tskIDLE_PRIORITY equivalent
-    TASK_PRIORITY_DEFAULT = 1,      // Default priority for most tasks
-    TASK_PRIORITY_APP_LOGIC = 2,    // App logic task priority
-    TASK_PRIORITY_UART_EVENT = 10,  // UART event task priority
-} task_priority_t;
+#define TASK_PRIORITY_LED_BLINK 1
+#define TASK_PRIORITY_APP_LOGIC 2
+#define TASK_PRIORITY_IO_MANAGER 1
+#define TASK_PRIORITY_PZ_TASK 1
+#define TASK_PRIORITY_LOGGER 1
+#define TASK_PRIORITY_ACCEL_TASK 1
+#define TASK_PRIORITY_USB_BOOT_CMD 1
+#define TASK_PRIORITY_UART_EVENT 10

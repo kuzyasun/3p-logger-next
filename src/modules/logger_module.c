@@ -287,5 +287,5 @@ hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
 }
 
 void logger_module_create_task(logger_module_t *module) {
-    xTaskCreatePinnedToCore(logger_task, "LOGGER", 4096, module, TASK_PRIORITY_DEFAULT, &module->task_handle, 0);
+    xTaskCreatePinnedToCore(logger_task, "LOGGER", 4096, module, TASK_PRIORITY_LOGGER, &module->task_handle, 0);
 }

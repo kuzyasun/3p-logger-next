@@ -181,5 +181,5 @@ void accel_module_create_task(accel_module_t *module) {
     if (!module) {
         return;
     }
-    xTaskCreatePinnedToCore(accel_module_task, "ACCEL_TASK", 4096, module, TASK_PRIORITY_DEFAULT, &module->task_handle, 0);
+    xTaskCreatePinnedToCore(accel_module_task, "ACCEL_TASK", 4096, module, TASK_PRIORITY_ACCEL_TASK, &module->task_handle, 0);
 }

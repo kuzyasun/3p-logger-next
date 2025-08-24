@@ -92,5 +92,5 @@ app_err_t pz_module_set_threshold(uint8_t dac1_value, uint8_t dac2_value) {
 }
 
 void pz_module_create_task(pz_module_t *module) {
-    xTaskCreatePinnedToCore(pz_module_task, "PZ_TASK", 4096, module, TASK_PRIORITY_DEFAULT, &module->task_handle, 0);
+    xTaskCreatePinnedToCore(pz_module_task, "PZ_TASK", 4096, module, TASK_PRIORITY_PZ_TASK, &module->task_handle, 0);
 }

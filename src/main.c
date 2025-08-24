@@ -66,7 +66,7 @@ static void usb_boot_cmd_task(void *arg) {
 
 void usb_boot_cmd_start(void) {
     REG_CLR_BIT(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
-    xTaskCreatePinnedToCore(usb_boot_cmd_task, "usb_boot_cmd", 3072, NULL, 1, NULL, tskNO_AFFINITY);
+    xTaskCreatePinnedToCore(usb_boot_cmd_task, "usb_boot_cmd", 3072, NULL, TASK_PRIORITY_USB_BOOT_CMD, NULL, tskNO_AFFINITY);
 }
 
 static const char *TAG = "Main";

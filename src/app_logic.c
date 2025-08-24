@@ -40,7 +40,7 @@ void app_logic_init(app_logic_t *app) {
     }
     led_module_init(app->led_module);
     if (app->led_module->is_initialized) {
-        BaseType_t led_ret = xTaskCreatePinnedToCore(led_blink_task, "LED_BLINK", 4096, app->led_module, TASK_PRIORITY_DEFAULT, &app->led_task_handle, 0);
+        BaseType_t led_ret = xTaskCreatePinnedToCore(led_blink_task, "LED_BLINK", 4096, app->led_module, TASK_PRIORITY_LED_BLINK, &app->led_task_handle, 0);
         if (led_ret != pdPASS) {
             LOG_E(TAG, "Failed to create LED task");
             return;
@@ -105,8 +105,8 @@ void app_logic_init(app_logic_t *app) {
     LOG_I(TAG, "Configuring IO peripherals...");
     if (g_app_config.uart1_enabled) {
         LOG_I(TAG, "UART1 enabled, configuring protocol %d at %d baud", g_app_config.uart1_protocol, g_app_config.uart1_baudrate);
-        io_manager_configure_uart(app->io_manager, &app->io_manager->uart1, g_app_config.uart1_protocol, g_app_config.uart1_baudrate,
-                                  UART1_RX_GPIO, SERIAL_UNUSED_GPIO);
+        io_manager_configure_uart(app->io_manager, &app->io_manager->uart1, g_app_config.uart1_protocol, g_app_config.uart1_baudrate, UART1_RX_GPIO,
+                                  SERIAL_UNUSED_GPIO);
     } else {
         LOG_I(TAG, "UART1 is disabled in configuration.");
     }
@@ -271,7 +271,7 @@ esp_err_t app_logic_start_all_tasks(app_logic_t *app) {
 
     // Start io_manager_task
     if (app->io_manager->initialized) {
-        BaseType_t io_manager_ret = xTaskCreatePinnedToCore(io_manager_task, "IO_MANAGER", 4096, app->io_manager, TASK_PRIORITY_DEFAULT,
+        BaseType_t io_manager_ret = xTaskCreatePinnedToCore(io_manager_task, "IO_MANAGER", 4096, app->io_manager, TASK_PRIORITY_IO_MANAGER,
                                                             &app->io_manager_handle, (cpu_cores > 1) ? 1 : 0);
         if (io_manager_ret != pdPASS) {
             LOG_E(TAG, "Failed to create io_manager_task");
