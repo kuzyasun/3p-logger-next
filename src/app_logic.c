@@ -22,12 +22,6 @@
 #include "modules/logger_module.h"
 #include "modules/pz_module.h"
 #include "platform/system.h"
-#include "protocols/crsf.h"
-#include "protocols/mavlink.h"
-#include "protocols/msp.h"
-#include "protocols/msp_v2.h"
-#include "protocols/nmea.h"
-#include "protocols/ublox.h"
 
 static const char *TAG = "APP";
 
@@ -107,18 +101,15 @@ void app_logic_init(app_logic_t *app) {
 
     g_command_queue = xQueueCreate(20, sizeof(app_command_t));
 
-    // Initialize all protocol parsers
-    nmea_parser_init(&app->nmea_parser);
-    crsf_parser_init(&app->crsf_parser);
-    ublox_parser_init(&app->ublox_parser);
-    msp_parser_init(&app->msp_parser);
-    msp_v2_parser_init(&app->msp_v2_parser);
-    mavlink_parser_init(&app->mavlink_parser);
-
-    // Configure UART1 for CRSF input
+    // Configure UART1 based on configuration settings
     LOG_I(TAG, "Configuring IO peripherals...");
-    io_manager_configure_uart(app->io_manager, &app->io_manager->uart1, app, g_app_config.uart1_protocol, g_app_config.uart1_baudrate, UART1_RX_GPIO,
-                              SERIAL_UNUSED_GPIO);
+    if (g_app_config.uart1_enabled) {
+        LOG_I(TAG, "UART1 enabled, configuring protocol %d at %d baud", g_app_config.uart1_protocol, g_app_config.uart1_baudrate);
+        io_manager_configure_uart(app->io_manager, &app->io_manager->uart1, g_app_config.uart1_protocol, g_app_config.uart1_baudrate,
+                                  UART1_RX_GPIO, SERIAL_UNUSED_GPIO);
+    } else {
+        LOG_I(TAG, "UART1 is disabled in configuration.");
+    }
 
     LOG_I(TAG, "Application Logic Initialized.");
 }

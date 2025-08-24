@@ -1,6 +1,7 @@
 #include "msp_v2.h"
 
 #include <log.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "app_state.h"
@@ -32,23 +33,25 @@ static uint8_t msp_v2_crc8(const uint8_t *data, size_t len, uint8_t crc) {
 }
 
 // --- Публічна функція ініціалізації ---
-void msp_v2_parser_init(msp_v2_parser_t *instance) {
-    if (!instance) {
-        LOG_E(TAG, "Invalid instance pointer");
+void msp_v2_parser_init(protocol_parser_t *parser) {
+    if (!parser) {
+        LOG_E(TAG, "Invalid parser pointer");
         return;
     }
 
-    // Ініціалізація базової структури парсера
-    instance->parser.state = &instance->state;
-    instance->parser.vtable.init = msp_v2_parser_internal_init;
-    instance->parser.vtable.process_byte = msp_v2_parser_internal_process_byte;
-    instance->parser.vtable.destroy = msp_v2_parser_internal_destroy;
-    instance->parser.is_initialized = false;
+    msp_v2_state_t *state = calloc(1, sizeof(msp_v2_state_t));
+    if (!state) {
+        LOG_E(TAG, "Failed to allocate memory for state");
+        return;
+    }
 
-    // Ініціалізація внутрішнього стану
-    memset(&instance->state, 0, sizeof(msp_v2_state_t));
+    parser->state = state;
+    parser->vtable.init = msp_v2_parser_internal_init;
+    parser->vtable.process_byte = msp_v2_parser_internal_process_byte;
+    parser->vtable.destroy = msp_v2_parser_internal_destroy;
+    parser->is_initialized = false;
 
-    LOG_I(TAG, "parser instance initialized");
+    LOG_I(TAG, "MSPv2 parser configured for dynamic allocation");
 }
 
 // --- Реалізація vtable-функцій ---
@@ -61,8 +64,9 @@ static void msp_v2_parser_internal_init(void *parser_state) {
 }
 
 static void msp_v2_parser_internal_destroy(void *parser_state) {
-    // Для простоти, destroy робить те саме, що й init
-    msp_v2_parser_internal_init(parser_state);
+    if (!parser_state) return;
+    free(parser_state);
+    LOG_D(TAG, "parser state destroyed and memory freed");
 }
 
 static void msp_v2_parser_internal_process_byte(void *parser_state, uint8_t byte) {

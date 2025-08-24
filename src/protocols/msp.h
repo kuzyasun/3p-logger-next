@@ -56,10 +56,4 @@ typedef struct {
     time_micros_t last_frame_recv;
 } msp_state_t;
 
-// Public MSP parser structure
-typedef struct {
-    protocol_parser_t parser;
-    msp_state_t state;
-} msp_parser_t;
-
-void msp_parser_init(msp_parser_t *instance);
+void msp_parser_init(protocol_parser_t *parser);

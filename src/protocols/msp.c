@@ -2,6 +2,7 @@
 
 #include <log.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "app_state.h"
@@ -17,21 +18,25 @@ static void msp_process_packet(msp_state_t *state, uint8_t cmd, const uint8_t *p
 static char box_names[256] = {0};      // Буфер для зберігання назв режимів
 static uint32_t active_box_flags = 0;  // Бітова маска активних режимів
 
-void msp_parser_init(msp_parser_t *instance) {
-    if (!instance) {
-        LOG_E(TAG, "Invalid instance pointer");
+void msp_parser_init(protocol_parser_t *parser) {
+    if (!parser) {
+        LOG_E(TAG, "Invalid parser pointer");
         return;
     }
 
-    instance->parser.state = &instance->state;
-    instance->parser.vtable.init = msp_parser_internal_init;
-    instance->parser.vtable.process_byte = msp_parser_internal_process_byte;
-    instance->parser.vtable.destroy = msp_parser_internal_destroy;
-    instance->parser.is_initialized = false;
+    msp_state_t *state = calloc(1, sizeof(msp_state_t));
+    if (!state) {
+        LOG_E(TAG, "Failed to allocate memory for state");
+        return;
+    }
 
-    memset(&instance->state, 0, sizeof(msp_state_t));
+    parser->state = state;
+    parser->vtable.init = msp_parser_internal_init;
+    parser->vtable.process_byte = msp_parser_internal_process_byte;
+    parser->vtable.destroy = msp_parser_internal_destroy;
+    parser->is_initialized = false;
 
-    LOG_I(TAG, "parser instance initialized");
+    LOG_I(TAG, "MSP parser configured for dynamic allocation");
 }
 
 static void msp_parser_internal_init(void *parser_state) {
@@ -106,10 +111,9 @@ static void msp_parser_internal_process_byte(void *parser_state, uint8_t byte) {
 }
 
 static void msp_parser_internal_destroy(void *parser_state) {
-    msp_state_t *state = (msp_state_t *)parser_state;
-    if (!state) return;
-    memset(state, 0, sizeof(msp_state_t));
-    LOG_D(TAG, "parser state destroyed");
+    if (!parser_state) return;
+    free(parser_state);
+    LOG_D(TAG, "parser state destroyed and memory freed");
 }
 
 static void update_flight_mode_string(app_state_t *app_state) {

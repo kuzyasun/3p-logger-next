@@ -2,6 +2,7 @@
 
 #include <log.h>
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "app_state.h"
@@ -40,23 +41,27 @@ static uint8_t crsf_crc8(const uint8_t *data, size_t len) {
 static inline int16_t decode_gps_alt_crsf(int16_t raw) { return (raw > 100) ? (raw - 1000) : raw; }
 
 // The only public function needed to create an instance
-void crsf_parser_init(crsf_parser_t *instance) {
-    if (!instance) {
-        LOG_E(TAG, "Invalid instance pointer");
+void crsf_parser_init(protocol_parser_t *parser) {
+    if (!parser) {
+        LOG_E(TAG, "Invalid parser pointer");
         return;
     }
 
-    // Initialize the base parser structure
-    instance->parser.state = &instance->state;
-    instance->parser.vtable.init = crsf_parser_internal_init;
-    instance->parser.vtable.process_byte = crsf_parser_internal_process_byte;
-    instance->parser.vtable.destroy = crsf_parser_internal_destroy;
-    instance->parser.is_initialized = false;
+    crsf_state_t *state = calloc(1, sizeof(crsf_state_t));
+    if (!state) {
+        LOG_E(TAG, "Failed to allocate memory for state");
+        return;
+    }
+
+    parser->state = state;
+    parser->vtable.init = crsf_parser_internal_init;
+    parser->vtable.process_byte = crsf_parser_internal_process_byte;
+    parser->vtable.destroy = crsf_parser_internal_destroy;
+    parser->is_initialized = false;
 
     // Initialize the internal state
-    memset(&instance->state, 0, sizeof(crsf_state_t));
-    instance->state.buf_pos = 0;
-    instance->state.last_frame_recv = 0;
+    state->buf_pos = 0;
+    state->last_frame_recv = 0;
 
     // Tuned for mountain flying (робастність проти нулів GPS)
     AltFuserCfg cfg = {
@@ -71,9 +76,9 @@ void crsf_parser_init(crsf_parser_t *instance) {
         .tauGpsS = 1.2f,      // важчий LP для GPS
         .fusedAlpha = 0.45f   // трохи швидше підтягування виходу
     };
-    alt_fuser_init(&instance->state.alt, &cfg);
+    alt_fuser_init(&state->alt, &cfg);
 
-    LOG_I(TAG, "parser instance initialized");
+    LOG_I(TAG, "CRSF parser configured for dynamic allocation");
 }
 
 // Internal vtable implementation: Initialize parser state
@@ -151,12 +156,9 @@ static void crsf_parser_internal_process_byte(void *parser_state, uint8_t byte) 
 
 // Internal vtable implementation: Destroy parser state
 static void crsf_parser_internal_destroy(void *parser_state) {
-    crsf_state_t *state = (crsf_state_t *)parser_state;
-    if (!state) return;
-
-    // Reset the state
-    memset(state, 0, sizeof(crsf_state_t));
-    LOG_D(TAG, "parser state destroyed");
+    if (!parser_state) return;
+    free(parser_state);
+    LOG_D(TAG, "parser state destroyed and memory freed");
 }
 
 // Internal helper function: Process a complete CRSF frame

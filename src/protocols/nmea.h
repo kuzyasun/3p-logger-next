@@ -19,11 +19,5 @@ typedef struct {
     time_micros_t last_frame_recv;
 } nmea_state_t;
 
-// The public-facing struct for the entire NMEA module
-typedef struct {
-    protocol_parser_t parser;  // The base parser "class"
-    nmea_state_t state;        // The internal state
-} nmea_parser_t;
-
 // The only public function needed to create an instance
-void nmea_parser_init(nmea_parser_t *instance);
+void nmea_parser_init(protocol_parser_t *parser);

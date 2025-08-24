@@ -82,10 +82,5 @@ typedef struct crsf_state_s {
     time_micros_t last_frame_recv;
 } crsf_state_t;
 
-typedef struct {
-    protocol_parser_t parser;
-    crsf_state_t state;
-} crsf_parser_t;
-
-void crsf_parser_init(crsf_parser_t *instance);
+void crsf_parser_init(protocol_parser_t *parser);
 bool crsf_process_frame(crsf_state_t *state, const uint8_t *frame_data, size_t total_frame_len);
