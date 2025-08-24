@@ -88,17 +88,14 @@ static void logger_task(void *arg) {
     }
 }
 
-hal_err_t logger_module_init(logger_module_t *module, hal_spi_bus_t sd_spi_bus) {
+hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
     memset(module, 0, sizeof(logger_module_t));
 
-    hal_err_t err = sdcard_init(sd_spi_bus, SD_SPI_CS_GPIO);
-    if (err != HAL_ERR_NONE) {
-        LOG_E(TAG, "Failed to initialize SD card HAL. Logger disabled.");
-        module->sd_card_ok = false;
-        return err;
+    module->sd_card_ok = is_sd_card_ok;
+    if (!module->sd_card_ok) {
+        LOG_E(TAG, "SD card not available. Logger disabled.");
+        return HAL_ERR_FAILED;
     }
-
-    module->sd_card_ok = true;
 
     int log_num = 0;
     char log_dir_path[32];
@@ -123,7 +120,7 @@ hal_err_t logger_module_init(logger_module_t *module, hal_spi_bus_t sd_spi_bus) 
 
     char log_file_path[64];
     sprintf(log_file_path, "%s/%d.log", log_dir_path, log_num);
-    err = sdcard_open_file(log_file_path, "w", &module->log_file);
+    hal_err_t err = sdcard_open_file(log_file_path, "w", &module->log_file);
     if (err != HAL_ERR_NONE) {
         LOG_E(TAG, "Failed to create log file %s", log_file_path);
         module->sd_card_ok = false;

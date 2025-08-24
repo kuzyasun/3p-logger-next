@@ -6,7 +6,6 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "hal/sdcard.h"
-#include "hal/spi.h"
 #include "util/observer.h"
 
 #define LOGGER_BUFFER_SIZE 8192
@@ -34,5 +33,5 @@ typedef struct logger_module_s {
     int log_map_count;
 } logger_module_t;
 
-hal_err_t logger_module_init(logger_module_t *module, hal_spi_bus_t sd_spi_bus);
+hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok);
 void logger_module_create_task(logger_module_t *module);

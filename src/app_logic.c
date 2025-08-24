@@ -36,9 +36,7 @@ static QueueHandle_t g_command_queue;
 void app_logic_init(app_logic_t *app) {
     LOG_I(TAG, "Initializing Application Logic...");
 
-    config_manager_load();
-
-    // Initialize IO Manager
+    // Initialize IO Manager first
     app->io_manager = calloc(1, sizeof(io_manager_t));
     if (app->io_manager == NULL) {
         LOG_E(TAG, "Failed to allocate memory for IO Manager. Halting.");
@@ -53,6 +51,9 @@ void app_logic_init(app_logic_t *app) {
             vTaskDelay(pdMS_TO_TICKS(1000));
         }
     }
+
+    // Load configuration now that IO is ready
+    config_manager_load();
 
     // Initialize LED Module
     app->led_module = calloc(1, sizeof(led_module_t));
@@ -131,13 +132,8 @@ app_err_t app_logic_init_modules(app_logic_t *app) {
     }
 
     // Initialize Logger
-    if (logger_module_init(app->logger_module, app->io_manager->sdcard_spi_bus) != HAL_ERR_NONE) {
-        LOG_E(TAG, "Failed to initialize logger module. Entering error state.");
-        app_state_begin_update();
-        app_state_set_u8(APP_STATE_FIELD_CURRENT_MODE, (uint8_t *)&state->current_mode, APP_MODE_ERROR);
-        state->system_error_code = APP_ERR_LOGGER_INIT_FAILED;
-        app_state_end_update();
-        return APP_ERR_LOGGER_INIT_FAILED;
+    if (logger_module_init(app->logger_module, app->io_manager->sd_card_ok) != HAL_ERR_NONE) {
+        LOG_W(TAG, "Failed to initialize logger module.");
     }
 
     // Initialize Piezo

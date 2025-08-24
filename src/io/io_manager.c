@@ -8,6 +8,7 @@
 
 #include "app_logic.h"
 #include "app_state.h"
+#include "hal/sdcard.h"
 
 static const char *TAG = "IOM";
 
@@ -28,6 +29,7 @@ static void uart_byte_received_callback(const serial_port_t *port, uint8_t b, vo
 
 hal_err_t io_manager_init(io_manager_t *iom) {
     memset(iom, 0, sizeof(*iom));
+    iom->sd_card_ok = false;
 
     LOG_I(TAG, "Initializing SPI buses...");
 
@@ -46,6 +48,16 @@ hal_err_t io_manager_init(io_manager_t *iom) {
         return err;
     }
     iom->sdcard_spi_bus = SDCARD_SPI_HOST;
+
+    // Initialize SD card driver
+    err = sdcard_init(iom->sdcard_spi_bus, SD_SPI_CS_GPIO);
+    if (err != HAL_ERR_NONE) {
+        LOG_E(TAG, "Failed to initialize SD card HAL. SD card functions will be disabled.");
+        iom->sd_card_ok = false;
+    } else {
+        LOG_I(TAG, "SD card initialized successfully.");
+        iom->sd_card_ok = true;
+    }
 
     LOG_I(TAG, "IO Manager Initialized Successfully");
     iom->initialized = true;
