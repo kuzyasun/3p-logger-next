@@ -44,7 +44,6 @@ static void set_default_config(void) {
     g_app_config.accel_config.full_scale = LIS3DH_16g;
     g_app_config.accel_config.op_mode = LIS3DH_HR_12bit;
     g_app_config.accel_config.bdu_enabled = true;
-    g_app_config.accel_config.data_ready_interrupt_enabled = true;
     g_app_config.accel_config.spi_bus = ACCEL_SPI_HOST;
     g_app_config.accel_config.cs_pin = ACC_SPI_CS_GPIO;
 
@@ -76,8 +75,6 @@ static void parse_line(char *line) {
         g_app_config.accel_config.op_mode = str_to_opmode(value);
     } else if (strcmp(key, "ACCEL_BDU_ENABLED") == 0) {
         g_app_config.accel_config.bdu_enabled = str_to_bool(value);
-    } else if (strcmp(key, "ACCEL_DATA_READY_INT") == 0) {
-        g_app_config.accel_config.data_ready_interrupt_enabled = str_to_bool(value);
     } else if (strcmp(key, "ACCEL_SPI_BUS") == 0) {
         g_app_config.accel_config.spi_bus = (hal_spi_bus_t)atoi(value);
     } else if (strcmp(key, "ACCEL_CS_PIN") == 0) {

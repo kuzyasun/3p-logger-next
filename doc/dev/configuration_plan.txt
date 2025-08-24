@@ -32,7 +32,6 @@ typedef struct {
     lis3dh_fs_t full_scale;
     lis3dh_op_md_t op_mode;
     bool bdu_enabled;
-    bool data_ready_interrupt_enabled;
     hal_spi_bus_t spi_bus;
     hal_gpio_t cs_pin;
 } extended_accel_config_t;
@@ -94,7 +93,6 @@ void set_default_config(void) {
     g_app_config.accel_config.full_scale = LIS3DH_16g;
     g_app_config.accel_config.op_mode = LIS3DH_HR_12bit;
     g_app_config.accel_config.bdu_enabled = true;
-    g_app_config.accel_config.data_ready_interrupt_enabled = true;
     g_app_config.accel_config.spi_bus = ACCEL_SPI_HOST; // Assuming this is defined
     g_app_config.accel_config.cs_pin = ACC_SPI_CS_GPIO;
     
@@ -251,7 +249,6 @@ typedef struct {
     lis3dh_fs_t full_scale;
     lis3dh_op_md_t op_mode;
     bool bdu_enabled;
-    bool data_ready_interrupt_enabled;
     hal_spi_bus_t spi_bus;
     hal_gpio_t cs_pin;
 } accel_config_t; // Keep original name for compatibility within module
@@ -283,10 +280,6 @@ hal_err_t accel_module_init(accel_module_t *module, const accel_config_t *config
     // Use the new config fields
     lis3dh_block_data_update_set(&module->driver_ctx, module->config.bdu_enabled ? PROPERTY_ENABLE : PROPERTY_DISABLE);
 
-    if(module->config.data_ready_interrupt_enabled) {
-        lis3dh_ctrl_reg3_t int_config = { .i1_zyxda = 1 }; // Enable data ready on INT1
-        lis3dh_pin_int1_config_set(&module->driver_ctx, &int_config);
-    }
 
     LOG_I(TAG, "LIS3DH initialized successfully.");
     module->initialized = true;
