@@ -23,11 +23,5 @@ typedef struct {
     uint8_t ck_b;
 } ublox_state_t;
 
-// The public-facing struct for the entire UBLOX module
-typedef struct {
-    protocol_parser_t parser;  // The base parser "class"
-    ublox_state_t state;       // The internal state
-} ublox_parser_t;
-
 // The only public function needed to create an instance
-void ublox_parser_init(ublox_parser_t *instance);
+void ublox_parser_init(protocol_parser_t *parser);

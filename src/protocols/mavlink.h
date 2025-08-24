@@ -21,14 +21,8 @@ typedef struct {
     time_micros_t last_frame_recv;
 } mavlink_state_t;
 
-// The public-facing struct for the entire MAVLink module
-typedef struct {
-    protocol_parser_t parser;  // The base parser "class"
-    mavlink_state_t state;     // The internal state
-} mavlink_parser_t;
-
 // The only public function needed to create an instance
-void mavlink_parser_init(mavlink_parser_t *instance);
+void mavlink_parser_init(protocol_parser_t *parser);
 
 #ifdef __cplusplus
 }

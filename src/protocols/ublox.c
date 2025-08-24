@@ -1,6 +1,7 @@
 #include "ublox.h"
 
 #include <log.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "app_state.h"
@@ -16,31 +17,34 @@ static void ublox_parser_internal_destroy(void *parser_state);
 static bool ublox_process_frame(ublox_state_t *state, uint8_t msg_class, uint8_t msg_id, const uint8_t *frame_data, size_t frame_length);
 
 // The only public function needed to create an instance
-void ublox_parser_init(ublox_parser_t *instance) {
-    if (!instance) {
-        LOG_E(TAG, "Invalid instance pointer");
+void ublox_parser_init(protocol_parser_t *parser) {
+    if (!parser) {
+        LOG_E(TAG, "Invalid parser pointer");
         return;
     }
 
-    // Initialize the base parser structure
-    instance->parser.state = &instance->state;
-    instance->parser.vtable.init = ublox_parser_internal_init;
-    instance->parser.vtable.process_byte = ublox_parser_internal_process_byte;
-    instance->parser.vtable.destroy = ublox_parser_internal_destroy;
-    instance->parser.is_initialized = false;
+    ublox_state_t *state = calloc(1, sizeof(ublox_state_t));
+    if (!state) {
+        LOG_E(TAG, "Failed to allocate memory for state");
+        return;
+    }
 
-    // Initialize the internal state
-    memset(&instance->state, 0, sizeof(ublox_state_t));
-    instance->state.buf_pos = 0;
-    instance->state.last_frame_recv = 0;
-    instance->state.step = 0;
-    instance->state.payload_length = 0;
-    instance->state.msg_class = 0;
-    instance->state.msg_id = 0;
-    instance->state.ck_a = 0;
-    instance->state.ck_b = 0;
+    parser->state = state;
+    parser->vtable.init = ublox_parser_internal_init;
+    parser->vtable.process_byte = ublox_parser_internal_process_byte;
+    parser->vtable.destroy = ublox_parser_internal_destroy;
+    parser->is_initialized = false;
 
-    LOG_I(TAG, "parser instance initialized");
+    state->buf_pos = 0;
+    state->last_frame_recv = 0;
+    state->step = 0;
+    state->payload_length = 0;
+    state->msg_class = 0;
+    state->msg_id = 0;
+    state->ck_a = 0;
+    state->ck_b = 0;
+
+    LOG_I(TAG, "UBLOX parser configured for dynamic allocation");
 }
 
 // Internal vtable implementation: Initialize parser state
@@ -145,12 +149,9 @@ static void ublox_parser_internal_process_byte(void *parser_state, uint8_t byte)
 
 // Internal vtable implementation: Destroy parser state
 static void ublox_parser_internal_destroy(void *parser_state) {
-    ublox_state_t *state = (ublox_state_t *)parser_state;
-    if (!state) return;
-
-    // Reset the state
-    memset(state, 0, sizeof(ublox_state_t));
-    LOG_D(TAG, "parser state destroyed");
+    if (!parser_state) return;
+    free(parser_state);
+    LOG_D(TAG, "parser state destroyed and memory freed");
 }
 
 // Internal helper function: Process a complete UBLOX frame

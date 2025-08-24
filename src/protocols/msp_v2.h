@@ -32,14 +32,8 @@ typedef struct {
 
 } msp_v2_state_t;
 
-// Публічна структура парсера MSPv2
-typedef struct {
-    protocol_parser_t parser;  // Базова структура парсера
-    msp_v2_state_t state;      // Внутрішній стан
-} msp_v2_parser_t;
-
 /**
  * @brief Ініціалізує екземпляр парсера MSPv2.
- * * @param instance Вказівник на екземпляр парсера.
+ * @param parser Вказівник на загальний парсер.
  */
-void msp_v2_parser_init(msp_v2_parser_t *instance);
+void msp_v2_parser_init(protocol_parser_t *parser);

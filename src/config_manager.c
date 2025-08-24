@@ -51,6 +51,7 @@ static void set_default_config(void) {
     g_app_config.pz_dac1_threshold = 128;
     g_app_config.pz_dac2_threshold = 128;
 
+    g_app_config.uart1_enabled = false;
     g_app_config.uart1_protocol = PROTOCOL_CRSF;
     g_app_config.uart1_baudrate = 420000;
 
@@ -85,6 +86,8 @@ static void parse_line(char *line) {
         g_app_config.pz_dac1_threshold = (uint8_t)atoi(value);
     } else if (strcmp(key, "PZ_THRESHOLD_2") == 0) {
         g_app_config.pz_dac2_threshold = (uint8_t)atoi(value);
+    } else if (strcmp(key, "UART1_ENABLED") == 0) {
+        g_app_config.uart1_enabled = str_to_bool(value);
     } else if (strcmp(key, "UART1_PROTOCOL") == 0) {
         g_app_config.uart1_protocol = str_to_protocol(value);
     } else if (strcmp(key, "UART1_BAUDRATE") == 0) {

@@ -6,9 +6,16 @@
 #include <string.h>
 #include <target.h>
 
-#include "app_logic.h"
 #include "app_state.h"
 #include "hal/sdcard.h"
+
+// Include all parser headers
+#include "protocols/crsf.h"
+#include "protocols/msp.h"
+#include "protocols/msp_v2.h"
+#include "protocols/nmea.h"
+#include "protocols/ublox.h"
+#include "protocols/mavlink.h"
 
 static const char *TAG = "IOM";
 
@@ -18,8 +25,8 @@ static const char *TAG = "IOM";
 static void uart_byte_received_callback(const serial_port_t *port, uint8_t b, void *user_data) {
     (void)port;
     io_uart_t *uart = (io_uart_t *)user_data;
-    if (uart && uart->parser && uart->parser->vtable.process_byte) {
-        uart->parser->vtable.process_byte(uart->parser->state, b);
+    if (uart && uart->parser.vtable.process_byte) {
+        uart->parser.vtable.process_byte(uart->parser.state, b);
     }
 }
 
@@ -65,39 +72,50 @@ hal_err_t io_manager_init(io_manager_t *iom) {
     return HAL_ERR_NONE;
 }
 
-void io_manager_configure_uart(io_manager_t *iom, io_uart_t *uart, struct app_logic_s *app_logic, protocol_e protocol, int baudrate, hal_gpio_t rx_pin,
-                               hal_gpio_t tx_pin) {
+void io_manager_configure_uart(io_manager_t *iom, io_uart_t *uart, protocol_e protocol, int baudrate, hal_gpio_t rx_pin, hal_gpio_t tx_pin) {
     (void)iom;
 
-    // Select parser based on protocol
+    // Clean up any previously allocated parser state
+    if (uart->parser.state) {
+        if (uart->parser.vtable.destroy) {
+            uart->parser.vtable.destroy(uart->parser.state);
+        } else {
+            free(uart->parser.state);
+        }
+    }
+    memset(&uart->parser, 0, sizeof(protocol_parser_t));
+
+    // Factory: initialize parser based on protocol
     switch (protocol) {
         case PROTOCOL_CRSF:
-            uart->parser = &app_logic->crsf_parser.parser;
+            crsf_parser_init(&uart->parser);
             break;
         case PROTOCOL_NMEA:
-            uart->parser = &app_logic->nmea_parser.parser;
+            nmea_parser_init(&uart->parser);
             break;
         case PROTOCOL_UBLOX:
-            uart->parser = &app_logic->ublox_parser.parser;
+            ublox_parser_init(&uart->parser);
             break;
         case PROTOCOL_MSP:
-            uart->parser = &app_logic->msp_parser.parser;
+            msp_parser_init(&uart->parser);
             break;
         case PROTOCOL_MSP_V2:
-            uart->parser = &app_logic->msp_v2_parser.parser;
+            msp_v2_parser_init(&uart->parser);
             break;
         case PROTOCOL_MAVLINK:
-            uart->parser = &app_logic->mavlink_parser.parser;
+            mavlink_parser_init(&uart->parser);
             break;
         default:
-            uart->parser = NULL;
             LOG_W(TAG, "No parser assigned for protocol ID: %d", protocol);
-            break;
+            return;
     }
 
-    if (uart->parser && !uart->parser->is_initialized && uart->parser->vtable.init) {
-        uart->parser->vtable.init(uart->parser->state);
-        uart->parser->is_initialized = true;
+    if (uart->parser.vtable.init) {
+        uart->parser.vtable.init(uart->parser.state);
+        uart->parser.is_initialized = true;
+    } else {
+        LOG_E(TAG, "Parser for protocol %d has no init function in vtable!", protocol);
+        return;
     }
 
     uart->protocol = protocol;

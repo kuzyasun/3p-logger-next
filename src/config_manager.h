@@ -25,6 +25,7 @@ typedef struct {
     extended_accel_config_t accel_config;
     uint8_t pz_dac1_threshold;
     uint8_t pz_dac2_threshold;
+    bool uart1_enabled;
     protocol_e uart1_protocol;
     int uart1_baudrate;
     int telemetry_params_count;

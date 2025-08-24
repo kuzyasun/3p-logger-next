@@ -18,25 +18,28 @@ static void mavlink_parser_internal_destroy(void *parser_state);
 static bool mavlink_process_frame(mavlink_state_t *state, const uint8_t *frame_data, size_t frame_length);
 
 // The only public function needed to create an instance
-void mavlink_parser_init(mavlink_parser_t *instance) {
-    if (!instance) {
-        LOG_E(TAG, "Invalid instance pointer");
+void mavlink_parser_init(protocol_parser_t *parser) {
+    if (!parser) {
+        LOG_E(TAG, "Invalid parser pointer");
         return;
     }
 
-    // Initialize the base parser structure
-    instance->parser.state = &instance->state;
-    instance->parser.vtable.init = mavlink_parser_internal_init;
-    instance->parser.vtable.process_byte = mavlink_parser_internal_process_byte;
-    instance->parser.vtable.destroy = mavlink_parser_internal_destroy;
-    instance->parser.is_initialized = false;
+    mavlink_state_t *state = calloc(1, sizeof(mavlink_state_t));
+    if (!state) {
+        LOG_E(TAG, "Failed to allocate memory for state");
+        return;
+    }
 
-    // Initialize the internal state
-    memset(&instance->state, 0, sizeof(mavlink_state_t));
-    instance->state.buf_pos = 0;
-    instance->state.last_frame_recv = 0;
+    parser->state = state;
+    parser->vtable.init = mavlink_parser_internal_init;
+    parser->vtable.process_byte = mavlink_parser_internal_process_byte;
+    parser->vtable.destroy = mavlink_parser_internal_destroy;
+    parser->is_initialized = false;
 
-    LOG_I(TAG, "parser instance initialized");
+    state->buf_pos = 0;
+    state->last_frame_recv = 0;
+
+    LOG_I(TAG, "MAVLink parser configured for dynamic allocation");
 }
 
 // Internal vtable implementation: Initialize parser state
@@ -107,12 +110,9 @@ static void mavlink_parser_internal_process_byte(void *parser_state, uint8_t byt
 
 // Internal vtable implementation: Destroy parser state
 static void mavlink_parser_internal_destroy(void *parser_state) {
-    mavlink_state_t *state = (mavlink_state_t *)parser_state;
-    if (!state) return;
-
-    // Reset the state
-    memset(state, 0, sizeof(mavlink_state_t));
-    LOG_D(TAG, "parser state destroyed");
+    if (!parser_state) return;
+    free(parser_state);
+    LOG_D(TAG, "parser state destroyed and memory freed");
 }
 
 // Internal helper function: Process a complete MAVLink frame

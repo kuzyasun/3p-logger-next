@@ -9,12 +9,6 @@
 #include "modules/led_module.h"
 #include "modules/logger_module.h"
 #include "modules/pz_module.h"
-#include "protocols/crsf.h"
-#include "protocols/mavlink.h"
-#include "protocols/msp.h"
-#include "protocols/msp_v2.h"
-#include "protocols/nmea.h"
-#include "protocols/ublox.h"
 
 typedef struct {
     TaskHandle_t app_logic_handle;
@@ -39,14 +33,6 @@ typedef struct app_logic_s {
     TaskHandle_t accel_task_handle;
     TaskHandle_t logger_task_handle;
     TaskHandle_t pz_task_handle;
-
-    // Protocol parsers
-    nmea_parser_t nmea_parser;
-    crsf_parser_t crsf_parser;
-    ublox_parser_t ublox_parser;
-    msp_parser_t msp_parser;
-    msp_v2_parser_t msp_v2_parser;
-    mavlink_parser_t mavlink_parser;
 
 } app_logic_t;
 
