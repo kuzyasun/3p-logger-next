@@ -105,81 +105,80 @@ typedef struct app_state_s {
     app_err_t system_error_code;
     app_mode_t current_mode;  // Current application mode
     // Plane telemetry
-    int32_t plane_longitude;
-    int32_t plane_latitude;
-    int32_t plane_altitude;  // GPS altitude (m)
-    // TODO convert to int16_t
-    int32_t plane_baro_altitude;   // Baro altitude (m or dm->m converted)
-    int32_t plane_fused_altitude;  // NEW: fused altitude (m)
-    int16_t plane_speed;
-    uint32_t plane_distance;
-    uint8_t plane_star;
-    uint8_t plane_fix;
-    int16_t plane_pitch;
-    int16_t plane_roll;
-    int16_t plane_heading;
-    uint16_t plane_vbat;
-    uint16_t plane_battery;
-    uint8_t plane_rssi;
-    int16_t plane_vspeed;            // Vertical speed in m/s * 10
-    char plane_flight_mode[24];      // Flight mode string
-    int32_t plane_esc_rpm;           // ESC RPM
-    uint16_t plane_esc_voltage;      // ESC voltage in mV
-    uint16_t plane_esc_current;      // ESC current in mA
-    uint8_t plane_esc_temperature;   // ESC temperature in °C
-    uint8_t plane_vtx_band;          // VTX band
-    uint8_t plane_vtx_channel;       // VTX channel
-    uint8_t plane_vtx_power;         // VTX power level
-    uint16_t plane_rc_channels[18];  // RC channel values (11-bit each)
+    int32_t plane_longitude;         // Provided by: CRSF, MAVLINK, MSP, MSP_V2, NMEA, UBLOX
+    int32_t plane_latitude;          // Provided by: CRSF, MAVLINK, MSP, MSP_V2, NMEA, UBLOX
+    int32_t plane_altitude;          // GPS altitude (m) - Provided by: CRSF, MAVLINK, MSP, MSP_V2, NMEA, UBLOX
+    int16_t plane_baro_altitude;     // Baro altitude (m or dm->m converted) - Provided by: CRSF, MAVLINK, MSP
+    int32_t plane_fused_altitude;    // Fused altitude (m) - Provided by: CRSF
+    int16_t plane_speed;             // Provided by: MAVLINK, MSP, MSP_V2, NMEA, UBLOX
+    uint32_t plane_distance;         // Provided by: -
+    uint8_t plane_star;              // Provided by: CRSF, MSP, MSP_V2, NMEA
+    uint8_t plane_fix;               // Provided by: CRSF, MSP, MSP_V2, NMEA
+    int16_t plane_pitch;             // Provided by: CRSF, MSP, MSP_V2
+    int16_t plane_roll;              // Provided by: CRSF, MSP, MSP_V2
+    int16_t plane_heading;           // Provided by: CRSF, MAVLINK, MSP, MSP_V2, NMEA, UBLOX
+    uint16_t plane_vbat;             // Provided by: CRSF, MSP, MSP_V2
+    uint16_t plane_battery;          // Provided by: CRSF, MSP, MSP_V2
+    uint8_t plane_rssi;              // Provided by: CRSF, MSP
+    int16_t plane_vspeed;            // Vertical speed in m/s * 10 - Provided by: CRSF, MAVLINK, MSP
+    char plane_flight_mode[24];      // Flight mode string - Provided by: CRSF, MSP
+    int32_t plane_esc_rpm;           // ESC RPM - Provided by: CRSF
+    uint16_t plane_esc_voltage;      // ESC voltage in mV - Provided by: CRSF
+    uint16_t plane_esc_current;      // ESC current in mA - Provided by: CRSF, MSP
+    uint8_t plane_esc_temperature;   // ESC temperature in °C - Provided by: CRSF
+    uint8_t plane_vtx_band;          // VTX band - Provided by: CRSF
+    uint8_t plane_vtx_channel;       // VTX channel - Provided by: CRSF
+    uint8_t plane_vtx_power;         // VTX power level - Provided by: CRSF
+    uint16_t plane_rc_channels[18];  // RC channel values (11-bit each) - Provided by: -
 
     // Missing fields that are used by protocols
-    uint8_t plane_armed;      // Armed status (0/1)
-    int16_t plane_home_dist;  // Distance to home in meters
-    int16_t plane_home_dir;   // Direction to home in degrees
+    uint8_t plane_armed;              // Armed status (0/1) - Provided by: MSP
+    int16_t plane_home_dist;          // Distance to home in meters - Provided by: MSP
+    int16_t plane_home_dir;           // Direction to home in degrees - Provided by: MSP
 
     // Additional GPS parameters
-    uint16_t plane_gps_hdop;          // Horizontal dilution of precision * 100
-    uint16_t plane_gps_vdop;          // Vertical dilution of precision * 100
-    uint16_t plane_gps_pdop;          // Position dilution of precision * 100
-    uint8_t plane_gps_fix_mode;       // Fix mode (1=no fix, 2=2D, 3=3D)
-    uint8_t plane_gps_sats_in_view;   // Number of satellites in view
-    int16_t plane_gps_geo_sep;        // Geoid separation in cm
-    int16_t plane_gps_mag_variation;  // Magnetic variation in degrees * 10
+    uint16_t plane_gps_hdop;          // Horizontal dilution of precision * 100 - Provided by: NMEA
+    uint16_t plane_gps_vdop;          // Vertical dilution of precision * 100 - Provided by: NMEA
+    uint16_t plane_gps_pdop;          // Position dilution of precision * 100 - Provided by: NMEA
+    uint8_t plane_gps_fix_mode;       // Fix mode (1=no fix, 2=2D, 3=3D) - Provided by: NMEA
+    uint8_t plane_gps_sats_in_view;   // Number of satellites in view - Provided by: NMEA
+    int16_t plane_gps_geo_sep;        // Geoid separation in cm - Provided by: NMEA
+    int16_t plane_gps_mag_variation;  // Magnetic variation in degrees * 10 - Provided by: NMEA
 
     // Additional telemetry parameters
-    int8_t plane_uplink_rssi;      // Uplink RSSI in dBm
-    uint8_t plane_uplink_lq;       // Uplink link quality in %
-    int8_t plane_uplink_snr;       // Uplink SNR in dB
-    int8_t plane_downlink_rssi;    // Downlink RSSI in dBm
-    uint8_t plane_downlink_lq;     // Downlink link quality in %
-    int8_t plane_downlink_snr;     // Downlink SNR in dB
-    uint8_t plane_rf_power_level;  // RF power level
+    int8_t plane_uplink_rssi;      // Uplink RSSI in dBm - Provided by: CRSF
+    uint8_t plane_uplink_lq;       // Uplink link quality in % - Provided by: CRSF
+    int8_t plane_uplink_snr;       // Uplink SNR in dB - Provided by: CRSF
+    int8_t plane_downlink_rssi;    // Downlink RSSI in dBm - Provided by: CRSF
+    uint8_t plane_downlink_lq;     // Downlink link quality in % - Provided by: CRSF
+    int8_t plane_downlink_snr;     // Downlink SNR in dB - Provided by: CRSF
+    uint8_t plane_rf_power_level;  // RF power level - Provided by: CRSF
 
     // Additional ESC telemetry (for multiple ESCs)
-    int32_t plane_esc2_rpm;          // ESC2 RPM
-    uint16_t plane_esc2_voltage;     // ESC2 voltage in mV
-    uint16_t plane_esc2_current;     // ESC2 current in mA
-    uint8_t plane_esc2_temperature;  // ESC2 temperature in °C
-    int32_t plane_esc3_rpm;          // ESC3 RPM
-    uint16_t plane_esc3_voltage;     // ESC3 voltage in mV
-    uint16_t plane_esc3_current;     // ESC3 current in mA
-    uint8_t plane_esc3_temperature;  // ESC3 temperature in °C
-    int32_t plane_esc4_rpm;          // ESC4 RPM
-    uint16_t plane_esc4_voltage;     // ESC4 voltage in mV
-    uint16_t plane_esc4_current;     // ESC4 current in mA
-    uint8_t plane_esc4_temperature;  // ESC4 temperature in °C
+    int32_t plane_esc2_rpm;          // ESC2 RPM - Provided by: -
+    uint16_t plane_esc2_voltage;     // ESC2 voltage in mV - Provided by: -
+    uint16_t plane_esc2_current;     // ESC2 current in mA - Provided by: -
+    uint8_t plane_esc2_temperature;  // ESC2 temperature in °C - Provided by: -
+    int32_t plane_esc3_rpm;          // ESC3 RPM - Provided by: -
+    uint16_t plane_esc3_voltage;     // ESC3 voltage in mV - Provided by: -
+    uint16_t plane_esc3_current;     // ESC3 current in mA - Provided by: -
+    uint8_t plane_esc3_temperature;  // ESC3 temperature in °C - Provided by: -
+    int32_t plane_esc4_rpm;          // ESC4 RPM - Provided by: -
+    uint16_t plane_esc4_voltage;     // ESC4 voltage in mV - Provided by: -
+    uint16_t plane_esc4_current;     // ESC4 current in mA - Provided by: -
+    uint8_t plane_esc4_temperature;  // ESC4 temperature in °C - Provided by: -
 
     // Additional time/date parameters
-    uint8_t plane_gps_time_hours;    // GPS time hours
-    uint8_t plane_gps_time_minutes;  // GPS time minutes
-    uint8_t plane_gps_time_seconds;  // GPS time seconds
-    uint8_t plane_gps_date_day;      // GPS date day
-    uint8_t plane_gps_date_month;    // GPS date month
-    uint8_t plane_gps_date_year;     // GPS date year (2-digit)
-    uint8_t piezo_mask;              // Piezo comparator bitmask
-    int16_t accel_x;                 // Raw accelerometer data X
-    int16_t accel_y;                 // Raw accelerometer data Y
-    int16_t accel_z;                 // Raw accelerometer data Z
+    uint8_t plane_gps_time_hours;    // GPS time hours - Provided by: NMEA
+    uint8_t plane_gps_time_minutes;  // GPS time minutes - Provided by: NMEA
+    uint8_t plane_gps_time_seconds;  // GPS time seconds - Provided by: NMEA
+    uint8_t plane_gps_date_day;      // GPS date day - Provided by: NMEA
+    uint8_t plane_gps_date_month;    // GPS date month - Provided by: NMEA
+    uint8_t plane_gps_date_year;     // GPS date year (2-digit) - Provided by: NMEA
+    uint8_t piezo_mask;              // Piezo comparator bitmask - Provided by: -
+    int16_t accel_x;                 // Raw accelerometer data X - Provided by: -
+    int16_t accel_y;                 // Raw accelerometer data Y - Provided by: -
+    int16_t accel_z;                 // Raw accelerometer data Z - Provided by: -
 
     Notifier *changed_notifier;
     uint64_t changed_mask;

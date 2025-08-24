@@ -309,7 +309,7 @@ static void msp_process_packet(msp_state_t *state, uint8_t cmd, const uint8_t *p
                 memcpy(&vario, payload + 4, sizeof(int16_t));
 
                 app_state_begin_update();
-                app_state_set_i32(APP_STATE_FIELD_PLANE_BARO_ALTITUDE, &app_state->plane_baro_altitude, alt / 100);
+                app_state_set_i16(APP_STATE_FIELD_PLANE_BARO_ALTITUDE, &app_state->plane_baro_altitude, (int16_t)(alt / 100));
                 app_state_set_i16(APP_STATE_FIELD_PLANE_VSPEED, &app_state->plane_vspeed, vario);
                 app_state_end_update();
                 LOG_D(TAG, "ALTITUDE: Alt=%.2fm Vario=%.2fm/s", (float)alt / 100.0f, (float)vario / 100.0f);
