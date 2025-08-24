@@ -10,10 +10,18 @@
 
 #define LOGGER_BUFFER_SIZE 8192
 
+typedef enum {
+    LOG_DTYPE_UNKNOWN,
+    LOG_DTYPE_INT16,
+    LOG_DTYPE_INT32,
+    LOG_DTYPE_FLOAT,
+} log_param_data_type_t;
+
 typedef struct {
     app_state_field_mask_e field_mask;
     size_t offset;
     size_t size;
+    log_param_data_type_t type;
     char name[MAX_PARAM_NAME_LEN];
 } log_param_map_t;
 
@@ -32,6 +40,7 @@ typedef struct logger_module_s {
     TaskHandle_t task_handle;
     Observer *observer;
     sdcard_file_handle_t log_file;
+    char csv_header[512];
 
     bool sd_card_ok;
     bool initialized;

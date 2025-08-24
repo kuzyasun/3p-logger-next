@@ -59,60 +59,51 @@ static inline void logger_append_crlf(logger_module_t *m) {
     logger_append_bytes(m, crlf, 2);
 }
 
-// -------------------- формування HEX-рядка --------------------
+// -------------------- формування CSV-рядка --------------------
 
-static void write_hex_line(logger_module_t *module) {
+static void write_csv_line(logger_module_t *module) {
     if (!module->sd_card_ok) return;
 
     app_state_t *state = app_state_get_instance();
 
-    // 1) Скласти бінарний запис у тимчасовий буфер
-    //    [u64 time_ms][i16 ax][i16 ay][i16 az][u8 piezo][...extra...]
-    uint8_t rec[128];
-    size_t rn = 0;
+    char line[512];
+    int offset = 0;
 
     uint64_t tms = (uint64_t)(esp_timer_get_time() / 1000ULL);
-    memcpy(rec + rn, &tms, sizeof(tms));
-    rn += sizeof(tms);
+    offset += snprintf(line + offset, sizeof(line) - offset, "%llu,%d,%d,%d,%u",
+                       tms,
+                       state->accel_x,
+                       state->accel_y,
+                       state->accel_z,
+                       state->piezo_mask);
 
-    memcpy(rec + rn, &state->accel_x, sizeof(state->accel_x));
-    rn += sizeof(state->accel_x);
-    memcpy(rec + rn, &state->accel_y, sizeof(state->accel_y));
-    rn += sizeof(state->accel_y);
-    memcpy(rec + rn, &state->accel_z, sizeof(state->accel_z));
-    rn += sizeof(state->accel_z);
-
-    memcpy(rec + rn, &state->piezo_mask, sizeof(state->piezo_mask));
-    rn += sizeof(state->piezo_mask);
-
-    // Додаткові параметри з плану (лише прості скаляри з відомими розмірами)
     for (int i = 0; i < module->log_map_count; i++) {
         log_param_map_t *entry = &module->log_map[i];
-        const uint8_t *ptr = ((const uint8_t *)state) + entry->offset;
+        const void *ptr = ((const uint8_t *)state) + entry->offset;
 
-        if (rn + entry->size > sizeof(rec)) break;  // запобігти переповненню
-        memcpy(rec + rn, ptr, entry->size);
-        rn += entry->size;
+        if (offset >= (int)sizeof(line) - 32) break;
+
+        offset += snprintf(line + offset, sizeof(line) - offset, ",");
+
+        switch (entry->type) {
+            case LOG_DTYPE_INT16:
+                offset += snprintf(line + offset, sizeof(line) - offset, "%d", *(const int16_t *)ptr);
+                break;
+            case LOG_DTYPE_INT32:
+                offset += snprintf(line + offset, sizeof(line) - offset, "%d", *(const int32_t *)ptr);
+                break;
+            case LOG_DTYPE_FLOAT:
+                offset += snprintf(line + offset, sizeof(line) - offset, "%.3f", *(const float *)ptr);
+                break;
+            default:
+                break;
+        }
     }
 
-    // 2) Перетворити бінарний буфер у HEX-символи (дві літери на байт, без роздільників)
-    // Максимальна довжина рядка: rn*2 + 2 (CRLF). rn тут гарантовано <= 128.
-    char line[128 * 2 + 2];
-    static const char HEX[] = "0123456789ABCDEF";
-    size_t ln = 0;
-    for (size_t i = 0; i < rn; ++i) {
-        uint8_t b = rec[i];
-        line[ln++] = HEX[b >> 4];
-        line[ln++] = HEX[b & 0x0F];
-    }
-    // Додаємо CRLF
-    line[ln++] = '\r';
-    line[ln++] = '\n';
+    offset += snprintf(line + offset, sizeof(line) - offset, "\r\n");
 
-    // 3) Додати у активний буфер
-    logger_append_bytes(module, (const uint8_t *)line, ln);
+    logger_append_bytes(module, (const uint8_t *)line, offset);
 
-    // Якщо активний буфер заповнився — злив у чергу
     if (module->active_buffer_idx >= LOGGER_BUFFER_SIZE) {
         logger_flush_active_buffer(module);
     }
@@ -130,7 +121,7 @@ static void on_app_state_change(Notifier *notifier, Observer *observer, void *da
     if (!(*changed_mask & trigger_mask)) {
         return;
     }
-    write_hex_line(module);
+    write_csv_line(module);
 }
 
 // -------------------- задача запису на SD --------------------
@@ -185,33 +176,42 @@ static void build_log_plan(logger_module_t *module) {
     module->log_map_count = 0;
     module->dynamic_record_size = 0;
 
-    // Додаємо тільки підтримані імена зі списку LOG_TELEMETRY у configuration.ini
+    strcpy(module->csv_header, "timestamp_ms,accel_x,accel_y,accel_z,piezo_mask");
+
     for (int i = 0; i < g_app_config.telemetry_params_count; ++i) {
         const char *name = g_app_config.telemetry_params[i];
         log_param_map_t *entry = &module->log_map[module->log_map_count];
+        entry->type = LOG_DTYPE_UNKNOWN;
 
         if (strcmp(name, "plane_speed") == 0) {
             entry->field_mask = APP_STATE_FIELD_PLANE_SPEED;
             entry->offset = offsetof(app_state_t, plane_speed);
             entry->size = sizeof(state->plane_speed);
+            entry->type = LOG_DTYPE_INT16;
         } else if (strcmp(name, "plane_fused_altitude") == 0) {
             entry->field_mask = APP_STATE_FIELD_PLANE_FUSED_ALTITUDE;
             entry->offset = offsetof(app_state_t, plane_fused_altitude);
             entry->size = sizeof(state->plane_fused_altitude);
+            entry->type = LOG_DTYPE_INT32;
         } else if (strcmp(name, "plane_baro_altitude") == 0) {
             entry->field_mask = APP_STATE_FIELD_PLANE_BARO_ALTITUDE;
             entry->offset = offsetof(app_state_t, plane_baro_altitude);
             entry->size = sizeof(state->plane_baro_altitude);
+            entry->type = LOG_DTYPE_INT16;
         } else if (strcmp(name, "plane_vspeed") == 0) {
             entry->field_mask = APP_STATE_FIELD_PLANE_VSPEED;
             entry->offset = offsetof(app_state_t, plane_vspeed);
             entry->size = sizeof(state->plane_vspeed);
+            entry->type = LOG_DTYPE_INT16;
         } else {
-            continue;  // інші — поки ігноруємо (щоб уникати рядків/масивів)
+            continue;
         }
 
         strncpy(entry->name, name, sizeof(entry->name) - 1);
         entry->name[sizeof(entry->name) - 1] = '\0';
+
+        strcat(module->csv_header, ",");
+        strcat(module->csv_header, name);
 
         module->dynamic_record_size += entry->size;
         module->log_map_count++;
@@ -227,6 +227,8 @@ hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
         LOG_E(TAG, "SD card not available. Logger disabled.");
         return HAL_ERR_FAILED;
     }
+
+    build_log_plan(module);
 
     // Папка /N з першим вільним індексом
     int log_num = 0;
@@ -249,15 +251,23 @@ hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
     sprintf(config_path, "%s/configuration.ini", log_dir_path);
     copy_config_file(config_path);
 
-    // Основний лог-файл у текстовому форматі (HEX-рядки)
+    // Main log file in CSV format
     char log_file_path[64];
-    sprintf(log_file_path, "%s/%d.txt", log_dir_path, log_num);
+    sprintf(log_file_path, "%s/data_%d.csv", log_dir_path, log_num);
     hal_err_t err = sdcard_open_file(log_file_path, "w", &module->log_file);
     if (err != HAL_ERR_NONE) {
         LOG_E(TAG, "Failed to create log file %s", log_file_path);
         module->sd_card_ok = false;
         return err;
     }
+
+    char file_header[1024];
+    int len = snprintf(file_header, sizeof(file_header),
+                       "# Firmware: 1.0.0\r\n# Session Start: %s\r\n# Fields: %s\r\n",
+                       "YYYY-MM-DD HH:MM:SS",
+                       module->csv_header);
+    sdcard_write(module->log_file, file_header, len);
+    sdcard_fsync(module->log_file);
 
     // Черга під шматки для запису
     module->buffer_queue = xQueueCreate(4, sizeof(logger_chunk_t));
@@ -270,8 +280,6 @@ hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
     module->active_buffer = module->ping_buffer;
     module->active_buffer_idx = 0;
 
-    build_log_plan(module);
-
     // Підписка на зміни стану
     module->observer = ObserverCreate("LOGGER_APP_STATE", module, on_app_state_change, NULL);
     if (module->observer) {
@@ -281,7 +289,7 @@ hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
         }
     }
 
-    LOG_I(TAG, "Logger initialized. HEX lines to %s", log_file_path);
+    LOG_I(TAG, "Logger initialized. CSV data to %s", log_file_path);
     module->initialized = true;
     return HAL_ERR_NONE;
 }
