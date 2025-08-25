@@ -20,34 +20,34 @@
 #include "soc/soc.h"
 
 IRAM_ATTR static void reboot_to_download_mode(void) {
-    // дати консолі доблювати буфер, щоб "BOOT\n" гарантовано пішов
+    // give the console time to flush the buffer so "BOOT\n" is guaranteed to go
     fflush(stdout);
     vTaskDelay(pdMS_TO_TICKS(10));
 
-    // 1) Дописуємо біт (не перезаписуємо увесь регістр!)
+    // 1) Add the bit (don't overwrite the entire register!)
     REG_SET_BIT(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
 
-    // 2) Коротка пауза, щоб біт гарантовано «сів»
+    // 2) Short pause to ensure the bit is guaranteed to set
     for (volatile int i = 0; i < 10000; ++i) {
     }
 
-    // 3) Чистий ROM-ресет → ROM бачить FORCE_DOWNLOAD_BOOT
+    // 3) Clean ROM reset → ROM sees FORCE_DOWNLOAD_BOOT
     esp_rom_software_reset_system();
 
     while (true) {
-    }  // на випадок, якщо компілятор спробує "піти далі"
+    }  // in case the compiler tries to "go further"
 }
 
 // SET BOOT MODE FOR S2 LOLIN MINI
 static void usb_boot_cmd_task(void *arg) {
     vTaskDelay(pdMS_TO_TICKS(3000));
 
-    const char *MAGIC = "BOOT\n";  // що надсилатиме PlatformIO
+    const char *MAGIC = "BOOT\n";  // what PlatformIO will send
     char line[16];
     int idx = 0;
 
     while (1) {
-        int c = fgetc(stdin);  // консоль уже на USB-CDC (CONFIG_ESP_CONSOLE_USB_CDC=y)
+        int c = fgetc(stdin);  // console is already on USB-CDC (CONFIG_ESP_CONSOLE_USB_CDC=y)
         if (c < 0) {
             vTaskDelay(pdMS_TO_TICKS(10));
             continue;
@@ -60,7 +60,7 @@ static void usb_boot_cmd_task(void *arg) {
             if (strcmp(line, MAGIC) == 0) {
                 fflush(stdout);
                 vTaskDelay(pdMS_TO_TICKS(50));
-                reboot_to_download_mode();  // перехід у ROM USB bootloader
+                reboot_to_download_mode();  // transition to ROM USB bootloader
             }
         }
     }

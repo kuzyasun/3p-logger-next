@@ -21,7 +21,7 @@ def _wait_reappear(timeout=12.0):
     while time.time() - t0 < timeout:
         now = _ports_by_vid()
         if now:
-            # повернемо перший знайдений порт (навіть якщо це та сама назва)
+            # return the first found port (even if it's the same name)
             return sorted(now.keys())[0]
         time.sleep(0.05)
     return None
@@ -31,7 +31,7 @@ def send_boot_and_pick_port():
     before_set  = set(before_dict.keys())
     target = sorted(before_set)[0] if before_set else None
 
-    # Надсилаємо BOOT у перший доступний порт (як і було)
+    # Send BOOT to the first available port (as before)
     if target:
         try:
             import serial

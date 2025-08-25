@@ -4,7 +4,7 @@ import subprocess
 from datetime import datetime
 from SCons.Script import Import, BUILD_TARGETS, COMMAND_LINE_TARGETS
 
-env = DefaultEnvironment()  # як у вас
+env = DefaultEnvironment()
 
 def write_if_changed(path: str, content: str) -> None:
     old = None
@@ -70,7 +70,7 @@ def should_run():
     print(f"Command line targets: {sorted(ct)}")
 
     if not bt and not ct:
-        return True  # звичайний pio run/pio build
+        return True  # regular pio run/pio build
 
     wanted = {"build", "buildprog", "upload", "program", "run", "test"}
     return bool(wanted & bt) or bool(wanted & ct)

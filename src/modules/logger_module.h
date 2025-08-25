@@ -7,7 +7,7 @@
 #include "freertos/task.h"
 #include "hal/sdcard.h"
 
-#define LOGGER_BUFFER_SIZE 8192
+#define LOGGER_BUFFER_SIZE 16384
 
 typedef enum {
     LOG_DTYPE_UNKNOWN,

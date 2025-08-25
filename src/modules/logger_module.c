@@ -333,7 +333,7 @@ hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
     }
 
     // Queue for data snapshots
-    module->data_queue = xQueueCreate(16, sizeof(log_data_snapshot_t));
+    module->data_queue = xQueueCreate(512, sizeof(log_data_snapshot_t));
     if (module->data_queue == NULL) {
         LOG_E(TAG, "Failed to create data queue. Logger disabled.");
         module->sd_card_ok = false;
@@ -357,14 +357,13 @@ hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
 }
 
 void logger_module_create_task(logger_module_t *module) {
-    BaseType_t status1 =
-        xTaskCreatePinnedToCore(logger_processing_task, "LOG_PROC", 4096, module, TASK_PRIORITY_LOGGER - 1, &module->processing_task_handle, 0);
+    BaseType_t status1 = xTaskCreatePinnedToCore(logger_processing_task, "LOG_PROC", 8192, module, TASK_PRIORITY_LOGGER, &module->processing_task_handle, 0);
     if (status1 != pdPASS) {
         LOG_E(TAG, "Failed to create LOG_PROC task!");
         return;
     }
 
-    BaseType_t status2 = xTaskCreatePinnedToCore(logger_sd_write_task, "LOG_WRITE", 4096, module, TASK_PRIORITY_LOGGER, &module->writer_task_handle, 0);
+    BaseType_t status2 = xTaskCreatePinnedToCore(logger_sd_write_task, "LOG_WRITE", 8192, module, TASK_PRIORITY_LOGGER - 1, &module->writer_task_handle, 0);
     if (status2 != pdPASS) {
         LOG_E(TAG, "Failed to create LOG_WRITE task!");
         return;
