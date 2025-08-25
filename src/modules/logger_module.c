@@ -2,13 +2,13 @@
 
 #include <esp_system.h>
 #include <esp_timer.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <stdbool.h>
 
 #include "app_state.h"
 #include "build_info.h"
@@ -24,13 +24,38 @@ typedef struct {
     log_param_data_type_t type;
 } app_state_param_info_t;
 
-#define APP_STATE_PARAM_INFO(field, dtype) \
-    { \
-        .name = #field, \
-        .offset = offsetof(app_state_t, field), \
-        .size = sizeof(((app_state_t *)0)->field), \
-        .type = dtype \
-    }
+#define APP_STATE_PARAM_INFO(field, dtype) {.name = #field, .offset = offsetof(app_state_t, field), .size = sizeof(((app_state_t *)0)->field), .type = dtype}
+
+// --- Helpers for formatting data into text ---
+
+static int format_i8(char *b, size_t s, const void *v) {
+    const log_snapshot_value_u *val = v;
+    return snprintf(b, s, "%d", val->val_i8);
+}
+static int format_u8(char *b, size_t s, const void *v) {
+    const log_snapshot_value_u *val = v;
+    return snprintf(b, s, "%u", val->val_u8);
+}
+static int format_i16(char *b, size_t s, const void *v) {
+    const log_snapshot_value_u *val = v;
+    return snprintf(b, s, "%d", val->val_i16);
+}
+static int format_u16(char *b, size_t s, const void *v) {
+    const log_snapshot_value_u *val = v;
+    return snprintf(b, s, "%u", val->val_u16);
+}
+static int format_i32(char *b, size_t s, const void *v) {
+    const log_snapshot_value_u *val = v;
+    return snprintf(b, s, "%ld", val->val_i32);
+}
+static int format_u32(char *b, size_t s, const void *v) {
+    const log_snapshot_value_u *val = v;
+    return snprintf(b, s, "%lu", val->val_u32);
+}
+static int format_f(char *b, size_t s, const void *v) {
+    const log_snapshot_value_u *val = v;
+    return snprintf(b, s, "%.3f", val->val_f);
+}
 
 static const app_state_param_info_t g_param_dictionary[] = {
     APP_STATE_PARAM_INFO(plane_speed, LOG_DTYPE_INT16),
@@ -97,7 +122,7 @@ static const int g_param_dictionary_size = sizeof(g_param_dictionary) / sizeof(g
 static hal_err_t copy_config_file(const char *dest_path);
 static void build_log_plan(logger_module_t *module);
 
-// -------------------- helpers для буферизації --------------------
+// -------------------- helpers for buffering --------------------
 
 static inline void logger_flush_active_buffer(logger_module_t *m) {
     if (!m->sd_card_ok || m->active_buffer_idx == 0) return;
@@ -144,7 +169,7 @@ static inline void logger_append_crlf(logger_module_t *m) {
     logger_append_bytes(m, crlf, 2);
 }
 
-// -------------------- логування за запитом --------------------
+// -------------------- logging on request --------------------
 
 void logger_module_trigger_snapshot(logger_module_t *module, uint8_t piezo_mask) {
     if (!module->initialized || app_state_get_instance()->current_mode != APP_MODE_LOGGING) {
@@ -232,7 +257,7 @@ static void logger_sd_write_task(void *arg) {
     }
 }
 
-// -------------------- задача формування CSV --------------------
+// -------------------- Task for formatting CSV --------------------
 
 static void logger_processing_task(void *arg) {
     logger_module_t *module = (logger_module_t *)arg;
@@ -243,8 +268,7 @@ static void logger_processing_task(void *arg) {
             char line[512];
             int offset = 0;
 
-            offset += snprintf(line + offset, sizeof(line) - offset, "%llu,%d,%d,%d,%u",
-                               snapshot.timestamp_us, snapshot.accel_x, snapshot.accel_y,
+            offset += snprintf(line + offset, sizeof(line) - offset, "%llu,%d,%d,%d,%u", snapshot.timestamp_us, snapshot.accel_x, snapshot.accel_y,
                                snapshot.accel_z, snapshot.piezo_mask);
 
             for (int i = 0; i < module->log_map_count; i++) {
@@ -253,8 +277,16 @@ static void logger_processing_task(void *arg) {
                 if (offset >= (int)sizeof(line) - (entry->size + 1)) break;
 
                 line[offset++] = ',';
-                memcpy(line + offset, &snapshot.telemetry_values[i], entry->size);
-                offset += entry->size;
+                // memcpy(line + offset, &snapshot.telemetry_values[i], entry->size);
+                // offset += entry->size;
+
+                if (entry->formatter) {
+                    offset += entry->formatter(line + offset, sizeof(line) - offset, &snapshot.telemetry_values[i]);
+                } else {
+                    // fallback: copy binary data
+                    memcpy(line + offset, &snapshot.telemetry_values[i], entry->size);
+                    offset += entry->size;
+                }
             }
 
             if (offset < (int)sizeof(line) - 2) {
@@ -294,8 +326,7 @@ static void build_log_plan(logger_module_t *module) {
     size_t header_buf_size = sizeof(module->csv_header);
     int offset = 0;
 
-    offset += snprintf(module->csv_header + offset, header_buf_size - offset,
-                       "timestamp_us,accel_x,accel_y,accel_z,piezo_mask");
+    offset += snprintf(module->csv_header + offset, header_buf_size - offset, "timestamp_us,accel_x,accel_y,accel_z,piezo_mask");
 
     for (int i = 0; i < g_app_config.telemetry_params_count; ++i) {
         if (module->log_map_count >= MAX_LOG_TELEMETRY_PARAMS) break;
@@ -308,16 +339,41 @@ static void build_log_plan(logger_module_t *module) {
             const app_state_param_info_t *dict_entry = &g_param_dictionary[j];
             if (strcmp(requested_name, dict_entry->name) == 0) {
                 log_param_map_t *log_map_entry = &module->log_map[module->log_map_count];
-                strncpy(log_map_entry->name, dict_entry->name,
-                        sizeof(log_map_entry->name) - 1);
+                strncpy(log_map_entry->name, dict_entry->name, sizeof(log_map_entry->name) - 1);
                 log_map_entry->name[sizeof(log_map_entry->name) - 1] = '\0';
                 log_map_entry->offset = dict_entry->offset;
                 log_map_entry->size = dict_entry->size;
                 log_map_entry->type = dict_entry->type;
                 log_map_entry->field_mask = APP_STATE_FIELD_NONE;
 
-                offset += snprintf(module->csv_header + offset, header_buf_size - offset,
-                                   ",%s", dict_entry->name);
+                switch (dict_entry->type) {
+                    case LOG_DTYPE_INT8:
+                        log_map_entry->formatter = format_i8;
+                        break;
+                    case LOG_DTYPE_UINT8:
+                        log_map_entry->formatter = format_u8;
+                        break;
+                    case LOG_DTYPE_INT16:
+                        log_map_entry->formatter = format_i16;
+                        break;
+                    case LOG_DTYPE_UINT16:
+                        log_map_entry->formatter = format_u16;
+                        break;
+                    case LOG_DTYPE_INT32:
+                        log_map_entry->formatter = format_i32;
+                        break;
+                    case LOG_DTYPE_UINT32:
+                        log_map_entry->formatter = format_u32;
+                        break;
+                    case LOG_DTYPE_FLOAT:
+                        log_map_entry->formatter = format_f;
+                        break;
+                    default:
+                        log_map_entry->formatter = NULL;
+                        break;
+                }
+
+                offset += snprintf(module->csv_header + offset, header_buf_size - offset, ",%s", dict_entry->name);
 
                 module->dynamic_record_size += log_map_entry->size;
                 module->log_map_count++;

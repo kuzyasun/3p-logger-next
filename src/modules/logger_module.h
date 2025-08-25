@@ -9,6 +9,16 @@
 
 #define LOGGER_BUFFER_SIZE 16384
 
+typedef union {
+    int8_t val_i8;
+    uint8_t val_u8;
+    int16_t val_i16;
+    uint16_t val_u16;
+    int32_t val_i32;
+    uint32_t val_u32;
+    float val_f;
+} log_snapshot_value_u;
+
 typedef enum {
     LOG_DTYPE_UNKNOWN,
     LOG_DTYPE_INT8,
@@ -20,28 +30,21 @@ typedef enum {
     LOG_DTYPE_FLOAT,
 } log_param_data_type_t;
 
+typedef int (*formatter_func_t)(char *buffer, size_t buffer_size, const void *value);
+
 typedef struct {
     app_state_field_mask_e field_mask;
     size_t offset;
     size_t size;
     log_param_data_type_t type;
     char name[MAX_PARAM_NAME_LEN];
+    formatter_func_t formatter;
 } log_param_map_t;
 
 typedef struct {
     uint8_t *data;
     size_t size;
 } logger_chunk_t;
-
-typedef union {
-    int8_t val_i8;
-    uint8_t val_u8;
-    int16_t val_i16;
-    uint16_t val_u16;
-    int32_t val_i32;
-    uint32_t val_u32;
-    float val_f;
-} log_snapshot_value_u;
 
 typedef struct {
     uint64_t timestamp_us;
