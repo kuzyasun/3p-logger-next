@@ -118,7 +118,7 @@ static void on_app_state_change(Notifier *notifier, Observer *observer, void *da
     }
 }
 
-// -------------------- задача запису на SD --------------------
+// -------------------- Task for writing to SD --------------------
 
 static void logger_sd_write_task(void *arg) {
     logger_module_t *module = (logger_module_t *)arg;
@@ -135,8 +135,9 @@ static void logger_sd_write_task(void *arg) {
         if (module->sd_card_ok && chunk.size > 0) {
             int written = sdcard_write(module->log_file, chunk.data, chunk.size);
             if (written != (int)chunk.size) LOG_E(TAG, "Write fail %d/%d", written, (int)chunk.size);
+            LOG_I(TAG, "Write %d", written);
             if (++chunks_since_sync >= 8) {
-                LOG_I(TAG, "Sync %d", chunks_since_sync);
+                LOG_I(TAG, "Sync");
                 fflush((FILE *)module->log_file);
                 sdcard_fsync(module->log_file);
                 chunks_since_sync = 0;
@@ -188,7 +189,7 @@ static void logger_processing_task(void *arg) {
     }
 }
 
-// -------------------- ініціалізація --------------------
+// -------------------- Initialization --------------------
 
 static hal_err_t copy_config_file(const char *dest_path) {
     FILE *src = fopen(SD_MOUNT_PATH "/configuration.ini", "r");

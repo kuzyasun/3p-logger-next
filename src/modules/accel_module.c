@@ -88,11 +88,19 @@ static void accel_module_task(void *arg) {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         if (lis3dh_acceleration_raw_get(&module->driver_ctx, raw_accel) == 0) {
             app_state_t *state = app_state_get_instance();
-            app_state_begin_update();
-            app_state_set_i16(APP_STATE_FIELD_ACCEL_X, &state->accel_x, raw_accel[0]);
-            app_state_set_i16(APP_STATE_FIELD_ACCEL_Y, &state->accel_y, raw_accel[1]);
-            app_state_set_i16(APP_STATE_FIELD_ACCEL_Z, &state->accel_z, raw_accel[2]);
-            app_state_end_update();
+            // Update state with transaction
+            // app_state_begin_update();
+            //  app_state_set_i16(APP_STATE_FIELD_ACCEL_X, &state->accel_x, raw_accel[0]);
+            //  app_state_set_i16(APP_STATE_FIELD_ACCEL_Y, &state->accel_y, raw_accel[1]);
+            //  app_state_set_i16(APP_STATE_FIELD_ACCEL_Z, &state->accel_z, raw_accel[2]);
+            // app_state_end_update();
+
+            // Update state without transaction
+            state->accel_x = raw_accel[0];
+            state->accel_y = raw_accel[1];
+            state->accel_z = raw_accel[2];
+            // TODO trigger logger
+
             // LOG_I(TAG, "Accel (INT): X:%d Y:%d Z:%d", raw_accel[0], raw_accel[1], raw_accel[2]);
         } else {
             LOG_W(TAG, "Interrupt received, but failed to read acceleration data.");
