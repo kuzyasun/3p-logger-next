@@ -1,3 +1,4 @@
 temp
 .pio
 managed_components
+/include/build_info.h
