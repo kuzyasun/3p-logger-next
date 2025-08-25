@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <stdbool.h>
 
 #include "app_state.h"
 #include "build_info.h"
@@ -15,6 +16,83 @@
 #include "target.h"
 
 static const char *TAG = "LOGR";
+
+typedef struct {
+    const char *name;
+    size_t offset;
+    size_t size;
+    log_param_data_type_t type;
+} app_state_param_info_t;
+
+#define APP_STATE_PARAM_INFO(field, dtype) \
+    { \
+        .name = #field, \
+        .offset = offsetof(app_state_t, field), \
+        .size = sizeof(((app_state_t *)0)->field), \
+        .type = dtype \
+    }
+
+static const app_state_param_info_t g_param_dictionary[] = {
+    APP_STATE_PARAM_INFO(plane_speed, LOG_DTYPE_INT16),
+    APP_STATE_PARAM_INFO(plane_fused_altitude, LOG_DTYPE_INT32),
+    APP_STATE_PARAM_INFO(plane_baro_altitude, LOG_DTYPE_INT16),
+    APP_STATE_PARAM_INFO(plane_vspeed, LOG_DTYPE_INT16),
+    APP_STATE_PARAM_INFO(plane_altitude, LOG_DTYPE_INT32),
+    APP_STATE_PARAM_INFO(plane_pitch, LOG_DTYPE_INT16),
+    APP_STATE_PARAM_INFO(plane_roll, LOG_DTYPE_INT16),
+    APP_STATE_PARAM_INFO(plane_heading, LOG_DTYPE_INT16),
+    APP_STATE_PARAM_INFO(plane_vbat, LOG_DTYPE_UINT16),
+    APP_STATE_PARAM_INFO(plane_battery, LOG_DTYPE_UINT16),
+    APP_STATE_PARAM_INFO(plane_longitude, LOG_DTYPE_INT32),
+    APP_STATE_PARAM_INFO(plane_latitude, LOG_DTYPE_INT32),
+    APP_STATE_PARAM_INFO(plane_distance, LOG_DTYPE_UINT32),
+    APP_STATE_PARAM_INFO(plane_star, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_fix, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_rssi, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_esc_rpm, LOG_DTYPE_INT32),
+    APP_STATE_PARAM_INFO(plane_esc_voltage, LOG_DTYPE_UINT16),
+    APP_STATE_PARAM_INFO(plane_esc_current, LOG_DTYPE_UINT16),
+    APP_STATE_PARAM_INFO(plane_esc_temperature, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_vtx_band, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_vtx_channel, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_vtx_power, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_armed, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_home_dist, LOG_DTYPE_INT16),
+    APP_STATE_PARAM_INFO(plane_home_dir, LOG_DTYPE_INT16),
+    APP_STATE_PARAM_INFO(plane_gps_hdop, LOG_DTYPE_UINT16),
+    APP_STATE_PARAM_INFO(plane_gps_vdop, LOG_DTYPE_UINT16),
+    APP_STATE_PARAM_INFO(plane_gps_pdop, LOG_DTYPE_UINT16),
+    APP_STATE_PARAM_INFO(plane_gps_fix_mode, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_gps_sats_in_view, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_gps_geo_sep, LOG_DTYPE_INT16),
+    APP_STATE_PARAM_INFO(plane_gps_mag_variation, LOG_DTYPE_INT16),
+    APP_STATE_PARAM_INFO(plane_uplink_rssi, LOG_DTYPE_INT8),
+    APP_STATE_PARAM_INFO(plane_uplink_lq, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_uplink_snr, LOG_DTYPE_INT8),
+    APP_STATE_PARAM_INFO(plane_downlink_rssi, LOG_DTYPE_INT8),
+    APP_STATE_PARAM_INFO(plane_downlink_lq, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_downlink_snr, LOG_DTYPE_INT8),
+    APP_STATE_PARAM_INFO(plane_rf_power_level, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_esc2_rpm, LOG_DTYPE_INT32),
+    APP_STATE_PARAM_INFO(plane_esc2_voltage, LOG_DTYPE_UINT16),
+    APP_STATE_PARAM_INFO(plane_esc2_current, LOG_DTYPE_UINT16),
+    APP_STATE_PARAM_INFO(plane_esc2_temperature, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_esc3_rpm, LOG_DTYPE_INT32),
+    APP_STATE_PARAM_INFO(plane_esc3_voltage, LOG_DTYPE_UINT16),
+    APP_STATE_PARAM_INFO(plane_esc3_current, LOG_DTYPE_UINT16),
+    APP_STATE_PARAM_INFO(plane_esc3_temperature, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_esc4_rpm, LOG_DTYPE_INT32),
+    APP_STATE_PARAM_INFO(plane_esc4_voltage, LOG_DTYPE_UINT16),
+    APP_STATE_PARAM_INFO(plane_esc4_current, LOG_DTYPE_UINT16),
+    APP_STATE_PARAM_INFO(plane_esc4_temperature, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_gps_time_hours, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_gps_time_minutes, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_gps_time_seconds, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_gps_date_day, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_gps_date_month, LOG_DTYPE_UINT8),
+    APP_STATE_PARAM_INFO(plane_gps_date_year, LOG_DTYPE_UINT8),
+};
+static const int g_param_dictionary_size = sizeof(g_param_dictionary) / sizeof(g_param_dictionary[0]);
 
 static hal_err_t copy_config_file(const char *dest_path);
 static void build_log_plan(logger_module_t *module);
@@ -87,11 +165,23 @@ void logger_module_trigger_snapshot(logger_module_t *module, uint8_t piezo_mask)
         const void *ptr = ((const uint8_t *)state) + entry->offset;
 
         switch (entry->type) {
+            case LOG_DTYPE_INT8:
+                snapshot.telemetry_values[i].val_i8 = *(const int8_t *)ptr;
+                break;
+            case LOG_DTYPE_UINT8:
+                snapshot.telemetry_values[i].val_u8 = *(const uint8_t *)ptr;
+                break;
             case LOG_DTYPE_INT16:
                 snapshot.telemetry_values[i].val_i16 = *(const int16_t *)ptr;
                 break;
+            case LOG_DTYPE_UINT16:
+                snapshot.telemetry_values[i].val_u16 = *(const uint16_t *)ptr;
+                break;
             case LOG_DTYPE_INT32:
                 snapshot.telemetry_values[i].val_i32 = *(const int32_t *)ptr;
+                break;
+            case LOG_DTYPE_UINT32:
+                snapshot.telemetry_values[i].val_u32 = *(const uint32_t *)ptr;
                 break;
             case LOG_DTYPE_FLOAT:
                 snapshot.telemetry_values[i].val_f = *(const float *)ptr;
@@ -153,32 +243,24 @@ static void logger_processing_task(void *arg) {
             char line[512];
             int offset = 0;
 
-            offset += snprintf(line + offset, sizeof(line) - offset, "%llu,%d,%d,%d,%u", snapshot.timestamp_us, snapshot.accel_x, snapshot.accel_y,
+            offset += snprintf(line + offset, sizeof(line) - offset, "%llu,%d,%d,%d,%u",
+                               snapshot.timestamp_us, snapshot.accel_x, snapshot.accel_y,
                                snapshot.accel_z, snapshot.piezo_mask);
 
             for (int i = 0; i < module->log_map_count; i++) {
                 log_param_map_t *entry = &module->log_map[i];
 
-                if (offset >= (int)sizeof(line) - 32) break;
+                if (offset >= (int)sizeof(line) - (entry->size + 1)) break;
 
-                offset += snprintf(line + offset, sizeof(line) - offset, ",");
-
-                switch (entry->type) {
-                    case LOG_DTYPE_INT16:
-                        offset += snprintf(line + offset, sizeof(line) - offset, "%d", snapshot.telemetry_values[i].val_i16);
-                        break;
-                    case LOG_DTYPE_INT32:
-                        offset += snprintf(line + offset, sizeof(line) - offset, "%ld", snapshot.telemetry_values[i].val_i32);
-                        break;
-                    case LOG_DTYPE_FLOAT:
-                        offset += snprintf(line + offset, sizeof(line) - offset, "%.3f", snapshot.telemetry_values[i].val_f);
-                        break;
-                    default:
-                        break;
-                }
+                line[offset++] = ',';
+                memcpy(line + offset, &snapshot.telemetry_values[i], entry->size);
+                offset += entry->size;
             }
 
-            offset += snprintf(line + offset, sizeof(line) - offset, "\r\n");
+            if (offset < (int)sizeof(line) - 2) {
+                line[offset++] = '\r';
+                line[offset++] = '\n';
+            }
             logger_append_bytes(module, (const uint8_t *)line, offset);
         }
     }
@@ -207,61 +289,46 @@ static hal_err_t copy_config_file(const char *dest_path) {
 }
 
 static void build_log_plan(logger_module_t *module) {
-    app_state_t *state = app_state_get_instance();
     module->log_map_count = 0;
     module->dynamic_record_size = 0;
-
-    int offset = 0;
     size_t header_buf_size = sizeof(module->csv_header);
+    int offset = 0;
 
-    offset += snprintf(module->csv_header + offset, header_buf_size - offset, "timestamp_us,accel_x,accel_y,accel_z,piezo_mask");
+    offset += snprintf(module->csv_header + offset, header_buf_size - offset,
+                       "timestamp_us,accel_x,accel_y,accel_z,piezo_mask");
 
     for (int i = 0; i < g_app_config.telemetry_params_count; ++i) {
-        if (module->log_map_count >= MAX_LOG_TELEMETRY_PARAMS) {
-            LOG_W(TAG, "Reached max log telemetry params limit (%d).", MAX_LOG_TELEMETRY_PARAMS);
-            break;
+        if (module->log_map_count >= MAX_LOG_TELEMETRY_PARAMS) break;
+        if (offset >= (int)header_buf_size - 32) break;
+
+        const char *requested_name = g_app_config.telemetry_params[i];
+        bool found = false;
+
+        for (int j = 0; j < g_param_dictionary_size; ++j) {
+            const app_state_param_info_t *dict_entry = &g_param_dictionary[j];
+            if (strcmp(requested_name, dict_entry->name) == 0) {
+                log_param_map_t *log_map_entry = &module->log_map[module->log_map_count];
+                strncpy(log_map_entry->name, dict_entry->name,
+                        sizeof(log_map_entry->name) - 1);
+                log_map_entry->name[sizeof(log_map_entry->name) - 1] = '\0';
+                log_map_entry->offset = dict_entry->offset;
+                log_map_entry->size = dict_entry->size;
+                log_map_entry->type = dict_entry->type;
+                log_map_entry->field_mask = APP_STATE_FIELD_NONE;
+
+                offset += snprintf(module->csv_header + offset, header_buf_size - offset,
+                                   ",%s", dict_entry->name);
+
+                module->dynamic_record_size += log_map_entry->size;
+                module->log_map_count++;
+                found = true;
+                break;
+            }
         }
 
-        if (offset >= (int)header_buf_size - 32) {
-            LOG_W(TAG, "CSV header buffer is full, some telemetry fields may be skipped.");
-            break;
+        if (!found) {
+            LOG_W(TAG, "Parameter '%s' from config not found in dictionary.", requested_name);
         }
-
-        const char *name = g_app_config.telemetry_params[i];
-        log_param_map_t *entry = &module->log_map[module->log_map_count];
-        entry->type = LOG_DTYPE_UNKNOWN;
-
-        if (strcmp(name, "plane_speed") == 0) {
-            entry->field_mask = APP_STATE_FIELD_PLANE_SPEED;
-            entry->offset = offsetof(app_state_t, plane_speed);
-            entry->size = sizeof(state->plane_speed);
-            entry->type = LOG_DTYPE_INT16;
-        } else if (strcmp(name, "plane_fused_altitude") == 0) {
-            entry->field_mask = APP_STATE_FIELD_PLANE_FUSED_ALTITUDE;
-            entry->offset = offsetof(app_state_t, plane_fused_altitude);
-            entry->size = sizeof(state->plane_fused_altitude);
-            entry->type = LOG_DTYPE_INT32;
-        } else if (strcmp(name, "plane_baro_altitude") == 0) {
-            entry->field_mask = APP_STATE_FIELD_PLANE_BARO_ALTITUDE;
-            entry->offset = offsetof(app_state_t, plane_baro_altitude);
-            entry->size = sizeof(state->plane_baro_altitude);
-            entry->type = LOG_DTYPE_INT16;
-        } else if (strcmp(name, "plane_vspeed") == 0) {
-            entry->field_mask = APP_STATE_FIELD_PLANE_VSPEED;
-            entry->offset = offsetof(app_state_t, plane_vspeed);
-            entry->size = sizeof(state->plane_vspeed);
-            entry->type = LOG_DTYPE_INT16;
-        } else {
-            continue;
-        }
-
-        strncpy(entry->name, name, sizeof(entry->name) - 1);
-        entry->name[sizeof(entry->name) - 1] = '\0';
-
-        offset += snprintf(module->csv_header + offset, header_buf_size - offset, ",%s", name);
-
-        module->dynamic_record_size += entry->size;
-        module->log_map_count++;
     }
 }
 
