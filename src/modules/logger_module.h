@@ -6,7 +6,6 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "hal/sdcard.h"
-#include "util/observer.h"
 
 #define LOGGER_BUFFER_SIZE 8192
 
@@ -55,7 +54,6 @@ typedef struct logger_module_s {
     QueueHandle_t buffer_queue;
     TaskHandle_t processing_task_handle;
     TaskHandle_t writer_task_handle;
-    Observer *observer;
     sdcard_file_handle_t log_file;
     char csv_header[1024];
 
@@ -70,3 +68,5 @@ typedef struct logger_module_s {
 
 hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok);
 void logger_module_create_task(logger_module_t *module);
+
+void logger_module_trigger_snapshot(logger_module_t *module, uint8_t piezo_mask);

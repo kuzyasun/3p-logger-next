@@ -9,6 +9,7 @@
 #include "app_state.h"
 #include "hal/gpio.h"
 #include "log.h"
+#include "logger_module.h"
 #include "target.h"
 
 static const char *TAG = "PZ";
@@ -33,23 +34,19 @@ static void IRAM_ATTR pz_gpio_isr_handler(void *arg) {
 }
 
 static void pz_module_task(void *arg) {
+    pz_module_t *module = (pz_module_t *)arg;
     uint8_t received_mask;
     app_state_t *state = app_state_get_instance();
 
     while (1) {
-        // Block and wait for a mask from the ISR
         if (xQueueReceive(pz_events_queue, &received_mask, portMAX_DELAY) == pdTRUE) {
-            LOG_I(TAG, "Piezo event received: mask=0x%02X bits=[%d%d%d%d]", received_mask, (received_mask >> 3) & 1, (received_mask >> 2) & 1,
-                  (received_mask >> 1) & 1, received_mask & 1);
+            LOG_I(TAG, "Piezo event received: mask=0x%02X", received_mask);
 
-            // Update state with transaction
-            // app_state_begin_update();
-            // app_state_set_u8(APP_STATE_FIELD_PIEZO_MASK, &state->piezo_mask, received_mask);
-            // app_state_end_update();
+            state->piezo_mask = received_mask;
 
-            // Update state without transaction
-
-            // TODO trigger logger and pass received_mask
+            if (module->logger) {
+                logger_module_trigger_snapshot(module->logger, received_mask);
+            }
         }
     }
 }
@@ -97,6 +94,7 @@ app_err_t pz_module_set_threshold(uint8_t dac1_value, uint8_t dac2_value) {
     return APP_OK;
 }
 
-void pz_module_create_task(pz_module_t *module) {
+void pz_module_create_task(pz_module_t *module, logger_module_t *logger_instance) {
+    module->logger = logger_instance;
     xTaskCreatePinnedToCore(pz_module_task, "PZ_TASK", 4096, module, TASK_PRIORITY_PZ_TASK, &module->task_handle, 0);
 }

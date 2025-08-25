@@ -66,32 +66,21 @@ static inline void logger_append_crlf(logger_module_t *m) {
     logger_append_bytes(m, crlf, 2);
 }
 
-// -------------------- реакція на зміни стану --------------------
+// -------------------- логування за запитом --------------------
 
-static void on_app_state_change(Notifier *notifier, Observer *observer, void *data) {
-    logger_module_t *module = (logger_module_t *)observer->context;
+void logger_module_trigger_snapshot(logger_module_t *module, uint8_t piezo_mask) {
+    if (!module->initialized || app_state_get_instance()->current_mode != APP_MODE_LOGGING) {
+        return;
+    }
+
     app_state_t *state = app_state_get_instance();
-
-    if (!module->initialized || state->current_mode != APP_MODE_LOGGING) {
-        LOG_I(TAG, "Not initialized or not in logging mode");
-        return;
-    }
-
-    uint64_t *changed_mask = (uint64_t *)data;
-    uint64_t trigger_mask = APP_STATE_FIELD_ACCEL_X | APP_STATE_FIELD_ACCEL_Y | APP_STATE_FIELD_ACCEL_Z | APP_STATE_FIELD_PIEZO_MASK;
-
-    if (!(*changed_mask & trigger_mask)) {
-        LOG_W(TAG, "No trigger");
-        return;
-    }
-
     log_data_snapshot_t snapshot;
 
     snapshot.timestamp_us = esp_timer_get_time();
     snapshot.accel_x = state->accel_x;
     snapshot.accel_y = state->accel_y;
     snapshot.accel_z = state->accel_z;
-    snapshot.piezo_mask = state->piezo_mask;
+    snapshot.piezo_mask = piezo_mask;
 
     for (int i = 0; i < module->log_map_count; i++) {
         log_param_map_t *entry = &module->log_map[i];
@@ -114,7 +103,7 @@ static void on_app_state_change(Notifier *notifier, Observer *observer, void *da
     }
 
     if (module->data_queue) {
-        xQueueSend(module->data_queue, &snapshot, 0);
+        xQueueSend(module->data_queue, &snapshot, pdMS_TO_TICKS(5));
     }
 }
 
@@ -355,15 +344,6 @@ hal_err_t logger_module_init(logger_module_t *module, bool is_sd_card_ok) {
 
     module->active_buffer = module->ping_buffer;
     module->active_buffer_idx = 0;
-
-    // Підписка на зміни стану
-    module->observer = ObserverCreate("LOGGER_APP_STATE", module, on_app_state_change, NULL);
-    if (module->observer) {
-        Notifier *app_state_notifier = app_state_get_notifier();
-        if (app_state_notifier) {
-            app_state_notifier->subject.attach(app_state_notifier, module->observer);
-        }
-    }
 
     LOG_I(TAG, "Logger initialized. CSV data to %s", log_file_path);
     module->initialized = true;

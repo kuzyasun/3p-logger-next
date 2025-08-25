@@ -7,6 +7,7 @@
 #include "freertos/task.h"
 #include "hal/gpio.h"
 #include "hal/spi.h"
+#include "logger_module.h"
 
 // Configuration structure for the LIS3DH sensor
 typedef struct {
@@ -24,9 +25,10 @@ typedef struct accel_module_s {
     TaskHandle_t task_handle;
     accel_config_t config;
     bool initialized;
+    logger_module_t *logger;
 } accel_module_t;
 
 // Public API
 hal_err_t accel_module_init(accel_module_t *module, const accel_config_t *config);
-void accel_module_create_task(accel_module_t *module);
+void accel_module_create_task(accel_module_t *module, logger_module_t *logger_instance);
 
