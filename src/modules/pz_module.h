@@ -6,7 +6,10 @@
 #include <stdint.h>
 
 #include "app_errors.h"
-#include "logger_module.h"
+
+// Forward declarations to break circular dependency
+struct logger_module_s;
+typedef struct logger_module_s logger_module_t;
 
 // Main module state structure
 typedef struct {

@@ -40,13 +40,14 @@ static void pz_module_task(void *arg) {
 
     while (1) {
         if (xQueueReceive(pz_events_queue, &received_mask, portMAX_DELAY) == pdTRUE) {
-            LOG_I(TAG, "Piezo event received: mask=0x%02X", received_mask);
-
             state->piezo_mask = received_mask;
 
             if (module->logger) {
                 logger_module_trigger_snapshot(module->logger, received_mask);
             }
+
+            // Comment it for production
+            LOG_I(TAG, "Piezo event received: mask=0x%02X", received_mask);
         }
     }
 }

@@ -3,7 +3,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "modules/accel_module.h"
+// Forward declarations to break circular dependency
+struct accel_module_s;
+typedef struct accel_module_s accel_module_t;
+
+#include "hal/gpio.h"
+#include "hal/spi.h"
+#include "lis3dh_reg.h"
 #include "protocols/protocol.h"
 
 #define MAX_LOG_TELEMETRY_PARAMS 16

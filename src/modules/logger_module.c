@@ -124,8 +124,10 @@ static void logger_sd_write_task(void *arg) {
         if (module->sd_card_ok && chunk.size > 0) {
             int written = sdcard_write(module->log_file, chunk.data, chunk.size);
             if (written != (int)chunk.size) LOG_E(TAG, "Write fail %d/%d", written, (int)chunk.size);
-            LOG_I(TAG, "Write %d", written);
+            // Comment it for production
+            LOG_I(TAG, "Write %d, dropped %d", written, module->dropped_chunks);
             if (++chunks_since_sync >= 8) {
+                // Comment it for production
                 LOG_I(TAG, "Sync");
                 fflush((FILE *)module->log_file);
                 sdcard_fsync(module->log_file);
