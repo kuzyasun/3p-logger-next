@@ -6,6 +6,7 @@
 #include "app_state.h"
 #include "hal/gpio.h"
 #include "log.h"
+#include "logger_module.h"
 #include "target.h"
 
 static const char *TAG = "ACCEL";
@@ -81,27 +82,19 @@ static void IRAM_ATTR accel_isr_handler(void *arg) {
 // --- Module Task ---
 static void accel_module_task(void *arg) {
     accel_module_t *module = (accel_module_t *)arg;
-
+    app_state_t *state = app_state_get_instance();
     int16_t raw_accel[3];
 
     while (1) {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         if (lis3dh_acceleration_raw_get(&module->driver_ctx, raw_accel) == 0) {
-            app_state_t *state = app_state_get_instance();
-            // Update state with transaction
-            // app_state_begin_update();
-            //  app_state_set_i16(APP_STATE_FIELD_ACCEL_X, &state->accel_x, raw_accel[0]);
-            //  app_state_set_i16(APP_STATE_FIELD_ACCEL_Y, &state->accel_y, raw_accel[1]);
-            //  app_state_set_i16(APP_STATE_FIELD_ACCEL_Z, &state->accel_z, raw_accel[2]);
-            // app_state_end_update();
-
-            // Update state without transaction
             state->accel_x = raw_accel[0];
             state->accel_y = raw_accel[1];
             state->accel_z = raw_accel[2];
-            // TODO trigger logger
 
-            // LOG_I(TAG, "Accel (INT): X:%d Y:%d Z:%d", raw_accel[0], raw_accel[1], raw_accel[2]);
+            if (module->logger) {
+                logger_module_trigger_snapshot(module->logger, 0);
+            }
         } else {
             LOG_W(TAG, "Interrupt received, but failed to read acceleration data.");
         }
@@ -224,11 +217,13 @@ hal_err_t accel_module_init(accel_module_t *module, const accel_config_t *config
     return HAL_ERR_NONE;
 }
 
-void accel_module_create_task(accel_module_t *module) {
+void accel_module_create_task(accel_module_t *module, logger_module_t *logger_instance) {
     if (!module) {
         LOG_E(TAG, "Module is NULL");
         return;
     }
+
+    module->logger = logger_instance;
 
     xTaskCreatePinnedToCore(accel_module_task, "ACCEL_TASK", 4096, module, TASK_PRIORITY_ACCEL_TASK, &module->task_handle, 0);
 

@@ -6,11 +6,13 @@
 #include <stdint.h>
 
 #include "app_errors.h"
+#include "logger_module.h"
 
 // Main module state structure
 typedef struct {
     bool is_initialized;
     TaskHandle_t task_handle;
+    logger_module_t *logger;
 } pz_module_t;
 
 /**
@@ -32,4 +34,4 @@ app_err_t pz_module_set_threshold(uint8_t dac1_value, uint8_t dac2_value);
  * @brief Creates the FreeRTOS task for the Piezo module.
  * @param module Pointer to the pz_module_t instance.
  */
-void pz_module_create_task(pz_module_t *module);
+void pz_module_create_task(pz_module_t *module, logger_module_t *logger_instance);

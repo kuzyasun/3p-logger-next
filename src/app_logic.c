@@ -275,7 +275,7 @@ esp_err_t app_logic_start_all_tasks(app_logic_t *app) {
     }
 
     if (app->accel_module->initialized) {
-        accel_module_create_task(app->accel_module);
+        accel_module_create_task(app->accel_module, app->logger_module);
         app->accel_task_handle = app->accel_module->task_handle;
         if (app->accel_task_handle == NULL) {
             LOG_E(TAG, "Failed to create accel_module_task");
@@ -301,7 +301,7 @@ esp_err_t app_logic_start_all_tasks(app_logic_t *app) {
     }
 
     if (app->pz_module->is_initialized) {
-        pz_module_create_task(app->pz_module);
+        pz_module_create_task(app->pz_module, app->logger_module);
         app->pz_task_handle = app->pz_module->task_handle;
         if (app->pz_task_handle == NULL) {
             LOG_E(TAG, "Failed to create pz_module_task");
