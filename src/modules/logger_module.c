@@ -103,7 +103,11 @@ void logger_module_trigger_snapshot(logger_module_t *module, uint8_t piezo_mask)
     }
 
     if (module->data_queue) {
-        xQueueSend(module->data_queue, &snapshot, pdMS_TO_TICKS(5));
+        // drop: черга забита -> не блокуємось!
+        if (xQueueSend(module->data_queue, &snapshot, 0) != pdTRUE) {
+            ++module->dropped_chunks;
+            LOG_E(TAG, "Failed to send snapshot to queue");
+        }
     }
 }
 
